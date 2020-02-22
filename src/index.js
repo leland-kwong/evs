@@ -1,5 +1,10 @@
-/* global document, window */
+/* global document */
+import * as htmlEscaper from 'html-escaper';
 import { getSupportedEventTypes } from './get-event-types';
+
+const IS_DEV = process
+  && process.env
+  && process.env.NODE_ENV === 'development';
 
 const generateGlobalId = (() => {
   let id = 0;
@@ -22,73 +27,95 @@ const nodeTypes = {
 
 const nsDelim = '::';
 
+// matches {mySelector}
+const expressionDelims = ['{', '}'];
+
 const subscriptions = new Map();
-
-function handleTrigger(cb) {
-  cb(this);
-}
-
-function triggerListeners(ev) {
-  subscriptions.forEach(handleTrigger, ev);
-}
 
 function dispose(ref) {
   subscriptions.delete(ref);
+}
+
+function validateAction(encodedAction) {
+  const maxLength = 1000;
+  if (encodedAction.length > maxLength) {
+    console.warn([
+      '[warning] encoded action length should not',
+      `exceed ${maxLength} characters. To send larger`,
+      'actions you should use the `dataSource` option.',
+      `Received:\n\n${encodedAction.slice(0, 100)}...`,
+    ].join(' '));
+  }
+
+  return encodedAction;
 }
 
 /**
  * Generates namespaced html data to be used
  * as a DOM attribute value.
  */
-function encodeHtmlData(namespace, obj) {
+function encodeAction(
+  namespace,
+  action,
+  context = null,
+  encoder = htmlEscaper.escape,
+) {
   // encoded to make it html attribute friendly
-  const data = window.btoa(JSON.stringify(obj));
+  const data = validateAction(
+    encoder(
+      JSON.stringify({
+        action,
+        context,
+      }),
+    ),
+  );
 
   return `${namespace}${nsDelim}${data}`;
 }
 
-function decodeHtmlData(attrData) {
-  return JSON.parse(window.atob(attrData));
-}
+function decodeAction(
+  event,
+  encodedAction,
+  dataSource,
+  decoder = (v) =>
+    v,
+) {
+  const expressions = [];
 
-function ignoreBuggyEvents(type) {
-  const eventsToIgnore = [
-    /**
-     * FIXME:
-     * Theres a bug with chrome inspector where
-     * pointerrawupdate makes it impossible to
-     * hover an element in the dom and inspect it.
-     */
-    'pointerrawupdate',
-  ];
+  function reviver(key, value) {
+    const [l, r] = expressionDelims;
+    const isExpression = typeof value === 'string'
+      && value[0] === l
+      && value.slice(-1) === r;
 
-  if (!eventsToIgnore.length) {
-    return true;
+    if (isExpression) {
+      expressions.push({
+        root: this,
+        key,
+        // expression without the delimiters
+        expr: value.slice(l.length, -r.length),
+      });
+    }
+
+    return value;
   }
 
-  const filterRe = new RegExp(eventsToIgnore.join('|'));
-  return !filterRe.test(type);
-}
+  const decodedAction = decoder(encodedAction);
+  const { action, context } = JSON.parse(
+    decodedAction,
+    reviver,
+  );
 
-function setupGlobalListeners() {
-  const eventTypes = [
-    ...getSupportedEventTypes(),
-    'focusin',
-    'focusout',
-  ].filter(ignoreBuggyEvents);
+  if (expressions.length) {
+    const transformExpression = ({ root, key, expr }) => {
+      const r = root;
+      r[key] = dataSource(expr, context, event);
+    };
 
-  // remove any previously applied global listeners
-  eventTypes.forEach((eventName) => {
-    document.removeEventListener(
-      eventName, triggerListeners,
-    );
-  });
+    expressions.forEach(transformExpression);
+  }
 
-  eventTypes.forEach((eventName) => {
-    document.addEventListener(
-      eventName, triggerListeners,
-    );
-  });
+  return action;
 }
 
 /*
@@ -98,7 +125,11 @@ function setupGlobalListeners() {
  * minimize the cost since it involves a bunch
  * of string decoding and parsing.
  */
-function getEventData(ev, decodeData, eventAttributePrefix) {
+function getEventData(
+  ev,
+  eventAttributePrefix,
+  dataSource,
+) {
   const { target, type } = ev;
   const normalizedType = mapEventType[type]
    || type;
@@ -116,10 +147,12 @@ function getEventData(ev, decodeData, eventAttributePrefix) {
       namespace: rawData.slice(
         0, rawData.indexOf(nsDelim),
       ),
-      data: decodeData(
+      data: decodeAction(
+        ev,
         rawData.slice(
           rawData.indexOf(nsDelim) + nsDelim.length,
         ),
+        dataSource,
       ),
     };
   }
@@ -128,6 +161,69 @@ function getEventData(ev, decodeData, eventAttributePrefix) {
     namespace: '@no-namespace',
     data: null,
   };
+}
+
+function handleDispatch(ref, refId) {
+  const { options, onEvent } = ref;
+  const {
+    eventAttributePrefix,
+    dataSource,
+  } = options;
+  const {
+    namespace,
+    data: parsed,
+  } = getEventData(this, eventAttributePrefix, dataSource);
+
+  if (namespace !== refId) {
+    return;
+  }
+
+  onEvent(parsed, this);
+}
+
+/* dispatches the dom event to subscribers */
+function dispatch(ev) {
+  subscriptions.forEach(handleDispatch, ev);
+}
+
+function ignoreBuggyEvents(type) {
+  const eventsToIgnore = [
+    /**
+     * NOTE:
+     * Theres a bug with chrome inspector where
+     * pointerrawupdate makes it impossible to
+     * hover an element in the dom and inspect it.
+     */
+    'pointerrawupdate',
+  ];
+
+  if (IS_DEV && !eventsToIgnore.length) {
+    return true;
+  }
+
+  const filterRe = new RegExp(eventsToIgnore.join('|'));
+  return !filterRe.test(type);
+}
+
+function setupGlobalListeners() {
+  const eventTypes = [
+    ...getSupportedEventTypes(),
+    'focusin',
+    'focusout',
+  ].filter(ignoreBuggyEvents);
+
+  // remove any previously applied global listeners
+  eventTypes.forEach((eventName) => {
+    document.removeEventListener(
+      eventName, dispatch,
+    );
+  });
+
+  eventTypes.forEach((eventName) => {
+    document.addEventListener(
+      eventName, dispatch,
+    );
+  });
 }
 
 function validateOptions(options) {
@@ -158,38 +254,25 @@ function validateOptions(options) {
  * TODO:
  * Consider an option for a custom data decoder.
  */
+
 const defaults = {
   namespacePrefix: '@',
-  eventAttributePrefix: '@',
+  eventAttributePrefix: ':',
+  dataSource: () =>
+    '@noDataSource',
 };
 
-/**
- * Only one subscriber is necessary per application.
- */
 function subscribe(onEvent, options = {}) {
   const finalOptions = validateOptions(
     { ...defaults, ...options },
   );
   const {
     namespacePrefix,
-    eventAttributePrefix,
   } = finalOptions;
   const id = generateGlobalId(namespacePrefix);
+  const ref = { onEvent, options: finalOptions };
 
-  function globalListener(ev) {
-    const {
-      namespace,
-      data: parsed,
-    } = getEventData(ev, decodeHtmlData, eventAttributePrefix);
-
-    if (namespace !== id) {
-      return;
-    }
-
-    onEvent(parsed, ev);
-  }
-
-  subscriptions.set(id, globalListener);
+  subscriptions.set(id, ref);
   return id;
 }
 
@@ -197,6 +280,7 @@ setupGlobalListeners();
 
 export {
   subscribe,
-  encodeHtmlData as encodeData,
+  encodeAction as action,
   dispose,
+  dispatch,
 };
