@@ -7,5 +7,11 @@ module.exports = {
   moduleNameMapper: {},
   testMatch: ['**/*.test.(js|jsx)'],
   testPathIgnorePatterns: ['./node_modules/'],
-  globals: {},
+  globals: {
+    window: {},
+    document: {
+      addEventListener() {},
+      removeEventListener() {},
+    },
+  },
 };

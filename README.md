@@ -1,6 +1,6 @@
-# DOM Event Stream
+# EVS
 
-Universal, data-driven DOM event stream.
+Data-driven DOM events for web applications.
 
 ## Benefits
 

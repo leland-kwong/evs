@@ -1,6 +1,7 @@
 /* global document */
-import * as htmlEscaper from 'html-escaper';
 import { getSupportedEventTypes } from './get-event-types';
+import { nsDelim } from './constants';
+import { encodeAction, decodeAction } from './action-encoder';
 
 const IS_DEV = process
   && process.env
@@ -25,142 +26,42 @@ const nodeTypes = {
   element: 1,
 };
 
-const nsDelim = '::';
-
-// matches {mySelector}
-const expressionDelims = ['{', '}'];
-
 const subscriptions = new Map();
 
 function dispose(ref) {
   subscriptions.delete(ref);
 }
 
-function validateAction(encodedAction) {
-  const maxLength = 1000;
-  if (encodedAction.length > maxLength) {
-    console.warn([
-      '[warning] encoded action length should not',
-      `exceed ${maxLength} characters. To send larger`,
-      'actions you should use the `dataSource` option.',
-      `Received:\n\n${encodedAction.slice(0, 100)}...`,
-    ].join(' '));
-  }
-
-  return encodedAction;
-}
-
-/**
- * Generates namespaced html data to be used
- * as a DOM attribute value.
- */
-function encodeAction(
-  namespace,
-  action,
-  context = null,
-  encoder = htmlEscaper.escape,
-) {
-  // encoded to make it html attribute friendly
-  const data = validateAction(
-    encoder(
-      JSON.stringify({
-        action,
-        context,
-      }),
-    ),
-  );
-
-  return `${namespace}${nsDelim}${data}`;
-}
-
-function decodeAction(
+function evaluateAction(
   event,
-  encodedAction,
+  rawData,
   dataSource,
-  decoder = (v) =>
-    v,
+  decoder,
 ) {
-  const expressions = [];
-
-  function reviver(key, value) {
-    const [l, r] = expressionDelims;
-    const isExpression = typeof value === 'string'
-      && value[0] === l
-      && value.slice(-1) === r;
-
-    if (isExpression) {
-      expressions.push({
-        root: this,
-        key,
-        // expression without the delimiters
-        expr: value.slice(l.length, -r.length),
-      });
-    }
-
-    return value;
-  }
-
-  const decodedAction = decoder(encodedAction);
-  const { action, context } = JSON.parse(
-    decodedAction,
-    reviver,
-  );
-
-  if (expressions.length) {
-    const transformExpression = ({ root, key, expr }) => {
-      const r = root;
-      r[key] = dataSource(expr, context, event);
-    };
-
-    expressions.forEach(transformExpression);
-  }
+  const action = decodeAction(rawData, decoder, dataSource, event);
 
   return action;
 }
 
-/*
- * TODO:
- * We should memoize this function since multiple
- * subscriptions will trigger this. We want to
- * minimize the cost since it involves a bunch
- * of string decoding and parsing.
- */
-function getEventData(
-  ev,
-  eventAttributePrefix,
-  dataSource,
-) {
-  const { target, type } = ev;
-  const normalizedType = mapEventType[type]
-   || type;
-  const isDOMElement = target
-    ? target.nodeType === nodeTypes.element
-    : false;
-  const rawData = isDOMElement
-    ? target.getAttribute(
-      `${eventAttributePrefix}${normalizedType}`,
+function parseActionNamespace(rawData) {
+  return rawData
+    ? rawData.slice(
+      0, rawData.indexOf(nsDelim),
     )
-    : null;
+    : '';
+}
 
-  if (rawData !== null) {
-    return {
-      namespace: rawData.slice(
-        0, rawData.indexOf(nsDelim),
-      ),
-      data: decodeAction(
-        ev,
-        rawData.slice(
-          rawData.indexOf(nsDelim) + nsDelim.length,
-        ),
-        dataSource,
-      ),
-    };
+function getActionAttr(DOMTarget, attrName) {
+  const isDOMElement = DOMTarget
+    ? DOMTarget.nodeType === nodeTypes.element
+    : false;
+
+  if (!isDOMElement) {
+    return null;
   }
 
-  return {
-    namespace: '@no-namespace',
-    data: null,
-  };
+  const { attributes } = DOMTarget;
+  return attributes[attrName];
 }
 
 function handleDispatch(ref, refId) {
@@ -169,14 +70,36 @@ function handleDispatch(ref, refId) {
     eventAttributePrefix,
     dataSource,
   } = options;
-  const {
-    namespace,
-    data: parsed,
-  } = getEventData(this, eventAttributePrefix, dataSource);
+  const { type, target } = this;
+  const normalizedType = mapEventType[type]
+   || type;
+  const actionAttr = getActionAttr(
+    target,
+    `${eventAttributePrefix}${normalizedType}`,
+  );
 
-  if (namespace !== refId) {
+  if (!actionAttr) {
     return;
   }
+
+  const domActionData = actionAttr
+    ? actionAttr.value
+    : null;
+  const namespace = parseActionNamespace(
+    domActionData,
+  );
+  const isNamespaceMatch = namespace === refId;
+
+  if (!isNamespaceMatch) {
+    return;
+  }
+
+
+  const parsed = evaluateAction(
+    this,
+    domActionData,
+    dataSource,
+  );
 
   onEvent(parsed, this);
 }
@@ -226,15 +149,13 @@ function setupGlobalListeners() {
   });
 }
 
-function validateOptions(options) {
-  const { namespacePrefix } = options;
-  if (namespacePrefix.includes(nsDelim)) {
+function validateNamespace(namespace) {
+  if (namespace.includes(nsDelim)) {
     throw new Error([
       `[invalid namespace] cannot have \`${nsDelim}\`.`,
-      `Received \`${namespacePrefix}\`.`,
+      `Received \`${namespace}\`.`,
     ].join(' '));
   }
-  return options;
 }
 
 /*
@@ -256,24 +177,27 @@ function validateOptions(options) {
  */
 
 const defaults = {
-  namespacePrefix: '@',
-  eventAttributePrefix: ':',
+  eventAttributePrefix: 'evs.',
   dataSource: () =>
     '@noDataSource',
 };
 
-function subscribe(onEvent, options = {}) {
-  const finalOptions = validateOptions(
-    { ...defaults, ...options },
-  );
-  const {
-    namespacePrefix,
-  } = finalOptions;
-  const id = generateGlobalId(namespacePrefix);
+/** creates a unique namespace with a unique id appended */
+function createNamespace(namespace = 'ns') {
+  return generateGlobalId(`${namespace}-`);
+}
+
+function subscribe(onEvent, namespace, options = {}) {
+  validateNamespace(namespace);
+
+  const finalOptions = {
+    ...defaults,
+    ...options,
+  };
   const ref = { onEvent, options: finalOptions };
 
-  subscriptions.set(id, ref);
-  return id;
+  subscriptions.set(namespace, ref);
+  return namespace;
 }
 
 setupGlobalListeners();
@@ -283,4 +207,5 @@ export {
   encodeAction as action,
   dispose,
   dispatch,
+  createNamespace,
 };

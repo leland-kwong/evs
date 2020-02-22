@@ -1,7 +1,10 @@
 /* global document, performance */
 import outdent from 'outdent';
 import morphdom from 'morphdom';
-import * as domEvent from '../src/index';
+import * as evs from '../src/index';
+
+const namespace = evs.createNamespace();
+const noop = () => {};
 
 const makeUniqueElement = (id = 'some-id', tagType = 'div') => {
   const fromBefore = document.querySelector(id);
@@ -47,7 +50,7 @@ function actionCreationPerf(
   // console.log(bigString.length);
   const ts = performance.now();
   iterRange.forEach(() => {
-    domEvent.action(subscription, {
+    evs.action(subscription, {
       type: 'setNewTodoText',
       text: '{inputValue}',
       listOfStrings: [bigString, bigString],
@@ -63,18 +66,18 @@ function actionCreationPerf(
 }
 
 function render(rootNode, state, subscription) {
-  const setNewTodoText = domEvent.action(subscription, {
+  const setNewTodoText = evs.action(subscription, {
     type: 'SetNewTodoText',
     text: '{inputValue}',
   });
 
-  const addTodo = domEvent.action(subscription, {
+  const addTodo = evs.action(subscription, {
     type: 'AddTodo',
     todoData: state.newTodo,
   });
 
   const TodoItem = ([id, { text, done }]) => {
-    const editText = domEvent.action(subscription, {
+    const editText = evs.action(subscription, {
       type: 'EditTodo',
       changes: {
         text: '{inputValue}',
@@ -82,7 +85,7 @@ function render(rootNode, state, subscription) {
       id,
     });
 
-    const toggleDone = domEvent.action(subscription, {
+    const toggleDone = evs.action(subscription, {
       type: 'EditTodo',
       changes: {
         done: '{inputChecked}',
@@ -95,46 +98,48 @@ function render(rootNode, state, subscription) {
         <input
           type="checkbox"
           ${done ? 'checked' : ''}
-          :change="${toggleDone}"
+          evs.change="${toggleDone}"
         />
         <input 
           data-foobar="'>'"
           value="${text}"
-          :input="${editText}"
+          evs.input="${editText}"
         />
       </li>
     `;
   };
 
-  const RunActionPerf = domEvent.action(subscription, {
+  const RunActionPerf = evs.action(subscription, {
     type: 'RunActionPerf',
+  }, {
+    foo: 'bar',
   });
 
-  const SetActionPerfCount = domEvent.action(subscription, {
+  const SetActionPerfCount = evs.action(subscription, {
     type: 'SetActionPerfCount',
     count: '{inputValue}',
   });
 
   const PerfUi = /* html */`
-    <form :submit="${RunActionPerf}">
+    <form evs.submit="${RunActionPerf}">
       <button 
+        evs.click="${RunActionPerf}"
         type="button"
-        :click="${RunActionPerf}"
       >
         action perf
       </button>
       <input 
+        evs.input="${SetActionPerfCount}"
         type="number"
         value="${state.actionPerf.count}"
-        :input="${SetActionPerfCount}"
       />
     </form>
   `;
 
   const NewTodoForm = /* html */`
-    <form :submit="${addTodo}">      
+    <form evs.submit="${addTodo}">      
       <input
-        :input="${setNewTodoText}"
+        evs.input="${setNewTodoText}"
         value="${state.newTodo.text}"
         placeholder="what needs to be done?"
       />
@@ -150,11 +155,20 @@ function render(rootNode, state, subscription) {
       <style>
         html,
         body {
+          margin: 0;
           min-height: 100vh;
+        }
+        
+        .app {
+          padding: 1em;
+          font-family: sans-serif;
         }
       </style>
 
       <div class="app">
+        <h1>EVS</h1>
+        <h2>data-driven events for the web</h2>
+        
         ${PerfUi}        
         ${NewTodoForm}
         <ul>${TodosList}</ul>
@@ -182,7 +196,7 @@ const initialState = {
   },
 };
 
-const actionHandlers = {
+const stateReducers = {
   AddTodo(state, action) {
     const { todoData } = action;
 
@@ -229,47 +243,51 @@ const actionHandlers = {
   },
 };
 
+const sideEffects = {
+  RunActionPerf(state) {
+    const { actionPerf } = state;
+    const results = actionCreationPerf(
+      actionPerf.count,
+      namespace,
+    );
+    console.log(results);
+  },
+};
+
 function init() {
   const { $root } = setupDOM();
 
   let state = initialState;
 
-  const update = (nextState, subscription) => {
+  const update = (nextState) => {
     state = nextState;
-    render($root, state, subscription);
+    render($root, state, namespace);
   };
 
-  const ref = domEvent.subscribe((action, ev) => {
+  evs.subscribe((action, ev) => {
+    console.log(action.type);
     const { type } = action;
-    const handler = actionHandlers[type];
+    const handler = stateReducers[type];
 
     if (ev.type === 'submit') {
       ev.preventDefault();
     }
 
-    if (type === 'RunActionPerf') {
-      const { actionPerf } = state;
-      console.log(
-        actionCreationPerf(
-          actionPerf.count,
-          ref,
-        ),
-      );
-      return;
-    }
+    const effectFn = sideEffects[type] || noop;
+    effectFn(state, action);
 
     if (!handler) {
       return;
     }
 
-    update(handler(state, action), ref);
-  }, {
-    dataSource(query, context, ev) {
-      return queries[query](state, context, ev);
+    update(handler(state, action));
+  }, namespace, {
+    dataSource(query, context, event) {
+      return queries[query](state, context, event);
     },
   });
 
-  update(state, ref);
+  update(state);
 }
 
 init();
