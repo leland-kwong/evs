@@ -1,14 +1,44 @@
 import * as htmlEscaper from 'html-escaper';
 import {
   nsDelim,
-  expressionDelims,
   isBrowser,
 } from './constants';
+import { string } from './internal/string';
 
 let encoderLengthWarned = false;
 
+const registeredActionFns = new Map();
+
 const identity = (v) =>
   v;
+
+function registerActionFn(namespace, fn) {
+  if (typeof fn !== 'function') {
+    const errorMessage = string([
+      'Actions must be be named functions.',
+      `Receieved: ${fn}`,
+    ], ' ');
+    throw new Error(errorMessage);
+  }
+
+  const fnName = fn.name;
+
+  if (fnName.length === 0) {
+    throw new Error(string([
+      'Anonymous functions may not be used',
+      'as actions',
+    ]));
+  }
+
+  const fnId = `${fn.name}--${namespace}`;
+  registeredActionFns.set(fnId, fn);
+  return fnId;
+}
+
+function getRegisteredAction(fnIdOrInlineAction) {
+  return registeredActionFns
+    .get(fnIdOrInlineAction);
+}
 
 function validateAction(encodedAction, action) {
   if (process.env.NODE_ENV === 'development') {
@@ -21,9 +51,8 @@ function validateAction(encodedAction, action) {
         .slice(0, 100);
 
       console.warn([
-        '[warning | large action] encoded action length should not',
-        `exceed ${maxLength} characters. To send larger`,
-        'actions you should use the `dataSource` option.',
+        '[warning] for better performance you should',
+        `keep the encoded action length below ${maxLength} characters.`,
         `Received action:\n\n${receivedAction}...`,
       ].join(' '));
     }
@@ -32,27 +61,75 @@ function validateAction(encodedAction, action) {
   return encodedAction;
 }
 
+const actionSplitter = '__::evs.action::__';
+
 /**
  * Generates namespaced html data to be used
  * as a DOM attribute value.
  */
 export function encodeAction(
-  namespace,
-  action,
+  scope,
+  actionFn,
   context = null,
   encoder = isBrowser
     ? htmlEscaper.escape
     : identity,
+  /*
+   * TODO:
+   * Add support for additional options such as:
+   *
+   * - preventDefault: boolean
+   * - stopPropagation: boolean
+   * - bubbles: boolean
+   * - capture: boolean
+   *
+   * We can provide them like so:
+   * ```js
+   * const options = {
+   *  preventDefault: true
+   * }
+   * evs.action(scope, Action, null, options)
+   * ```
+   *
+   * TODO:
+   * Add support for special context functions to
+   * handle common things like event values, mouse
+   * coordinates etc... The way it can work is any
+   * function identifiers that are found in the context
+   * are called with the current event.
+   *
+   * We can do this by doing something like:
+   * ```js
+   * function InputValue(ev) {
+   *  return ev.target.value
+   * }
+   *
+   * function Action(inputText) {
+   *  return {
+   *    type: 'Action',
+   *    text: inputText
+   *  }
+   * }
+   *
+   * evs.action(scope, Action, InputValue)
+   * ```
+   * */
 ) {
+  const {
+    namespace,
+  } = scope;
   // encoded to make it html attribute friendly
+  const rawAction = registerActionFn(namespace, actionFn);
+  const rawContext = JSON.stringify(context);
   const data = validateAction(
     encoder(
-      JSON.stringify([
-        context,
-        action,
-      ], null, 2),
+      string([
+        rawAction,
+        actionSplitter,
+        rawContext,
+      ]),
     ),
-    action,
+    rawAction,
   );
 
   return `${namespace}${nsDelim}${data}`;
@@ -61,43 +138,18 @@ export function encodeAction(
 export function decodeAction(
   rawData,
   decoder = identity,
-  dataSource,
   event,
 ) {
-  let contextParsed = false;
-  let context;
-
-  function reviver(key, value) {
-    const isContextValue = !contextParsed
-      && key === '0';
-    if (isContextValue) {
-      contextParsed = true;
-      context = value;
-      return value;
-    }
-
-    const [l, r] = expressionDelims;
-    const isExpression = typeof value === 'string'
-      && value[0] === l
-      && value.slice(-1) === r;
-
-    if (isExpression) {
-      const expression = value
-        .slice(l.length, -r.length);
-      return dataSource(expression, context, event);
-    }
-
-    return value;
-  }
-
   const encodedAction = rawData.slice(
     rawData.indexOf(nsDelim) + nsDelim.length,
   );
-  const decodedAction = decoder(encodedAction);
-
-  const [, action] = JSON.parse(
-    decodedAction,
-    reviver,
-  );
-  return action;
+  const [
+    rawAction, rawContext,
+  ] = decoder(encodedAction)
+    .split(actionSplitter);
+  const context = JSON.parse(rawContext);
+  const actionFn = getRegisteredAction(rawAction)
+    // eslint-disable-next-line no-new-func
+    || Function(rawAction)();
+  return actionFn(context, event);
 }

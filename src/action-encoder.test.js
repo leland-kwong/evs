@@ -4,28 +4,28 @@ import {
 } from './action-encoder';
 
 import {
-  createNamespace,
+  createScope,
 } from './index';
 
-const ns = createNamespace('@actionEncoder');
+const ns = createScope('@actionEncoder');
 
 describe('action encoder', () => {
-  test('encoder', () => {
+  test('encode with action function', () => {
     const context = {
       contextProp: 'foo',
     };
-    const helpers = {
-      myHelper(ctx) {
-        return ctx.contextProp;
-      },
-    };
-    const encoded = encodeAction(ns, {
-      type: 'SomeAction',
-      propExpression: '{myHelper}',
-    }, context);
-    const dataSource = (query, ctx) =>
-      helpers[query](ctx);
-    const decoded = decodeAction(encoded, undefined, dataSource);
+    function SomeAction(ctx) {
+      return {
+        type: 'SomeAction',
+        propExpression: ctx.contextProp,
+      };
+    }
+    const encoded = encodeAction(
+      ns, SomeAction, context,
+    );
+    const decoded = decodeAction(
+      encoded, undefined, null,
+    );
 
     expect(decoded).toEqual({
       type: 'SomeAction',

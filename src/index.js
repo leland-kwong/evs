@@ -1,20 +1,12 @@
 /* global document */
 import { getSupportedEventTypes } from './get-event-types';
 import { nsDelim } from './constants';
+import { uid } from './internal/uid';
 import { encodeAction, decodeAction } from './action-encoder';
 
 const IS_DEV = process
   && process.env
   && process.env.NODE_ENV === 'development';
-
-const generateGlobalId = (() => {
-  let id = 0;
-
-  return function generateId(prefix) {
-    id += 1;
-    return `${prefix}${id}`;
-  };
-})();
 
 const mapEventType = {
   focusin: 'focus',
@@ -30,17 +22,6 @@ const subscriptions = new Map();
 
 function dispose(ref) {
   subscriptions.delete(ref);
-}
-
-function evaluateAction(
-  event,
-  rawData,
-  dataSource,
-  decoder,
-) {
-  const action = decodeAction(rawData, decoder, dataSource, event);
-
-  return action;
 }
 
 function parseActionNamespace(rawData) {
@@ -68,7 +49,6 @@ function handleDispatch(ref, refId) {
   const { options, onEvent } = ref;
   const {
     eventAttributePrefix,
-    dataSource,
   } = options;
   const { type, target } = this;
   const normalizedType = mapEventType[type]
@@ -95,10 +75,10 @@ function handleDispatch(ref, refId) {
   }
 
 
-  const parsed = evaluateAction(
-    this,
+  const parsed = decodeAction(
     domActionData,
-    dataSource,
+    undefined,
+    this,
   );
 
   onEvent(parsed, this);
@@ -178,26 +158,37 @@ function validateNamespace(namespace) {
 
 const defaults = {
   eventAttributePrefix: 'evs.',
-  dataSource: () =>
-    '@noDataSource',
 };
 
 /** creates a unique namespace with a unique id appended */
-function createNamespace(namespace = 'ns') {
-  return generateGlobalId(`${namespace}-`);
-}
-
-function subscribe(onEvent, namespace, options = {}) {
+function createScope(namespace = 'ns', options) {
   validateNamespace(namespace);
 
-  const finalOptions = {
+  const optionsWithDefaults = {
     ...defaults,
     ...options,
   };
-  const ref = { onEvent, options: finalOptions };
+
+  return {
+    namespace: `${namespace}-${uid()}`,
+    options: optionsWithDefaults,
+    /*
+     * TODO:
+     * Expose a `useAction` and `subscribe` method that
+     * has the scope automatically bound. This way we
+     * don't have to do something like `evs.action(scope, MyAction, ...)`
+     * and can just do `useAction(MyAction, ...)` which is
+     * far more convenient
+     */
+  };
+}
+
+function subscribe(scope, onEvent) {
+  const { options, namespace } = scope;
+  const ref = { onEvent, options };
 
   subscriptions.set(namespace, ref);
-  return namespace;
+  return `${namespace}-subscription`;
 }
 
 setupGlobalListeners();
@@ -207,5 +198,5 @@ export {
   encodeAction as action,
   dispose,
   dispatch,
-  createNamespace,
+  createScope,
 };

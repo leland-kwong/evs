@@ -3,7 +3,10 @@ import outdent from 'outdent';
 import morphdom from 'morphdom';
 import * as evs from '../src/index';
 
-const namespace = evs.createNamespace();
+const evScope = evs.createScope('EvsTest');
+const useAction = (actionFn, arg) =>
+  evs.action(evScope, actionFn, arg);
+
 const noop = () => {};
 
 const makeUniqueElement = (id = 'some-id', tagType = 'div') => {
@@ -26,18 +29,6 @@ function setupDOM() {
   return { $root };
 }
 
-const queries = {
-  inputValue(state, context, ev) {
-    return ev.target.value;
-  },
-  inputChecked(state, context, ev) {
-    return ev.target.checked;
-  },
-  newTodo(state) {
-    return state.newTodo;
-  },
-};
-
 function benchFn(
   fn, arg, numTests,
   runSoFar = 0, results = [],
@@ -54,33 +45,50 @@ function benchFn(
   return results;
 }
 
-function render(rootNode, state, subscription) {
-  const setNewTodoText = evs.action(subscription, {
+const SetNewTodoText = (ctx, ev) =>
+  ({
     type: 'SetNewTodoText',
-    text: '{inputValue}',
+    text: ev.target.value,
   });
 
-  const addTodo = evs.action(subscription, {
+const AddTodo = () =>
+  ({
     type: 'AddTodo',
-    todoData: state.newTodo,
   });
 
-  const TodoItem = ([id, { text, done }]) => {
-    const editText = evs.action(subscription, {
-      type: 'EditTodo',
-      changes: {
-        text: '{inputValue}',
-      },
-      id,
-    });
+const RunActionPerf = () =>
+  ({
+    type: 'RunActionPerf',
+  });
 
-    const toggleDone = evs.action(subscription, {
-      type: 'EditTodo',
-      changes: {
-        done: '{inputChecked}',
-      },
-      id,
-    });
+const SetActionPerfCount = (ctx, ev) =>
+  ({
+    type: 'SetActionPerfCount',
+    count: ev.target.value,
+  });
+
+const TodoSetText = (id, event) =>
+  ({
+    type: 'EditTodo',
+    changes: {
+      text: event.target.value,
+    },
+    id,
+  });
+
+const TodoSetDone = (id, event) =>
+  ({
+    type: 'EditTodo',
+    changes: {
+      done: event.target.checked,
+    },
+    id,
+  });
+
+function render(rootNode, state) {
+  const TodoItem = ([id, { text, done }]) => {
+    const editText = useAction(TodoSetText, id);
+    const toggleDone = useAction(TodoSetDone, id);
 
     return /* html */`
       <li>
@@ -98,21 +106,12 @@ function render(rootNode, state, subscription) {
     `;
   };
 
-  const RunActionPerf = evs.action(subscription, {
-    type: 'RunActionPerf',
-  });
-
-  const SetActionPerfCount = evs.action(subscription, {
-    type: 'SetActionPerfCount',
-    count: '{inputValue}',
-  });
-
   const PerfUi = /* html */`
-    <form evs.submit="${RunActionPerf}">
+    <form evs.submit="${useAction(RunActionPerf)}">
       <div>
         test count:
         <input 
-          evs.input="${SetActionPerfCount}"
+          evs.input="${useAction(SetActionPerfCount)}"
           type="number"
           min="0"
           max="50"
@@ -120,7 +119,7 @@ function render(rootNode, state, subscription) {
         />
       </div>
       <button 
-        evs.click="${RunActionPerf}"
+        evs.click="${useAction(RunActionPerf)}"
         type="button"
       >
         action perf
@@ -129,9 +128,9 @@ function render(rootNode, state, subscription) {
   `;
 
   const NewTodoForm = /* html */`
-    <form evs.submit="${addTodo}">      
+    <form evs.submit="${useAction(AddTodo)}">      
       <input
-        evs.input="${setNewTodoText}"
+        evs.input="${useAction(SetNewTodoText)}"
         value="${state.newTodo.text}"
         placeholder="what needs to be done?"
       />
@@ -159,11 +158,12 @@ function render(rootNode, state, subscription) {
 
       <div class="app">
         <h1>EVS</h1>
-        <h2>data-driven events for the web</h2>
-        
-        ${PerfUi}        
+        <h2>data-driven events for the web</h2>         
+
+        ${PerfUi}
+
         ${NewTodoForm}
-        <ul>${TodosList}</ul>
+        ${TodosList}
       </div>
     </div>
   `);
@@ -189,15 +189,14 @@ const initialState = {
 };
 
 const stateReducers = {
-  AddTodo(state, action) {
-    const { todoData } = action;
-
+  AddTodo(state) {
     return {
       ...state,
       newTodo: setupNewTodo(),
       todos: {
         ...state.todos,
-        [todoData.id]: todoData,
+        [state.newTodo.id]:
+          state.newTodo,
       },
     };
   },
@@ -237,25 +236,33 @@ const stateReducers = {
 
 const sideEffects = {
   RunActionPerf(state) {
-    const iterRange = new Array(10).fill(0);
-    const listOfStrings = new Array(400).fill(0).map(() =>
+    const iterRange = new Array(100).fill(0);
+    const listOfStrings = new Array(200).fill(0).map(() =>
       Math.random().toString(16).slice(0, 6));
+    console.log(listOfStrings.join().length);
+    const actionHandler = (ctx, ev) => {
+      console.log(ctx);
+      return {
+        type: 'setNewTodoText',
+        text: ev.target.value,
+      };
+    };
     // console.log(listOfStrings.join('').length);
     function actionCreationPerf(
-      subscription,
+      scope,
     ) {
       iterRange.forEach(() => {
-        evs.action(subscription, {
-          type: 'setNewTodoText',
-          text: '{inputValue}',
+        evs.action(
+          scope,
+          actionHandler,
           listOfStrings,
-        });
+        );
       });
     }
     const { actionPerf } = state;
     const results = benchFn(
       actionCreationPerf,
-      namespace,
+      evs.createScope('testBench'),
       actionPerf.count,
     );
     console.log(results);
@@ -263,17 +270,19 @@ const sideEffects = {
 };
 
 function init() {
-  const { $root } = setupDOM();
-
   let state = initialState;
+
+  console.log(evScope);
+
+  const { $root } = setupDOM();
 
   const update = (nextState) => {
     state = nextState;
-    render($root, state, namespace);
+    render($root, state);
   };
 
-  evs.subscribe((action, ev) => {
-    console.log(action.type);
+  evs.subscribe(evScope, (action, ev) => {
+    console.log(action);
     const { type } = action;
     const handler = stateReducers[type];
 
@@ -289,10 +298,6 @@ function init() {
     }
 
     update(handler(state, action));
-  }, namespace, {
-    dataSource(query, context, event) {
-      return queries[query](state, context, event);
-    },
   });
 
   update(state);
