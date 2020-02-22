@@ -1,7 +1,7 @@
 {
-  "name": "atomic",
+  "name": "evs",
   "version": "1.0.0",
-  "description": "",
+  "description": "A dom event system for web applications",
   "private": true,
   "main": "index.js",
   "scripts": {
