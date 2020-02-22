@@ -5,18 +5,28 @@ import {
   isBrowser,
 } from './constants';
 
+let encoderLengthWarned = false;
+
 const identity = (v) =>
   v;
 
-function validateAction(encodedAction) {
-  const maxLength = 1000;
-  if (encodedAction.length > maxLength) {
-    console.warn([
-      '[warning] encoded action length should not',
-      `exceed ${maxLength} characters. To send larger`,
-      'actions you should use the `dataSource` option.',
-      `Received:\n\n${encodedAction.slice(0, 100)}...`,
-    ].join(' '));
+function validateAction(encodedAction, action) {
+  if (process.env.NODE_ENV === 'development') {
+    const maxLength = 2000;
+    const isWarning = encodedAction.length > maxLength;
+    if (isWarning && !encoderLengthWarned) {
+      encoderLengthWarned = true;
+
+      const receivedAction = JSON.stringify(action, null, 2)
+        .slice(0, 100);
+
+      console.warn([
+        '[warning | large action] encoded action length should not',
+        `exceed ${maxLength} characters. To send larger`,
+        'actions you should use the `dataSource` option.',
+        `Received action:\n\n${receivedAction}...`,
+      ].join(' '));
+    }
   }
 
   return encodedAction;
@@ -42,18 +52,12 @@ export function encodeAction(
         action,
       ], null, 2),
     ),
+    action,
   );
 
   return `${namespace}${nsDelim}${data}`;
 }
 
-/*
- * TODO:
- * We might be able to memoize this function since multiple
- * subscriptions will trigger this. We want to
- * minimize the cost since it involves a bunch
- * of string decoding and parsing.
- */
 export function decodeAction(
   rawData,
   decoder = identity,

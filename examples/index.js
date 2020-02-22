@@ -38,28 +38,17 @@ const queries = {
   },
 };
 
-function actionCreationPerf(
-  numTests,
-  subscription,
-  runSoFar = 0,
-  results = [],
+function benchFn(
+  fn, arg, numTests,
+  runSoFar = 0, results = [],
 ) {
-  const iterRange = new Array(500).fill(0);
-  const bigString = new Array(10).fill(0).map(() =>
-    Math.random().toString(16).slice(0, 6)).join('');
-  // console.log(bigString.length);
-  const ts = performance.now();
-  iterRange.forEach(() => {
-    evs.action(subscription, {
-      type: 'setNewTodoText',
-      text: '{inputValue}',
-      listOfStrings: [bigString, bigString],
-    });
-  });
-  results.push(performance.now() - ts);
   if (runSoFar < numTests) {
-    return actionCreationPerf(
-      numTests, subscription, runSoFar + 1, results,
+    const ts = performance.now();
+    fn(arg);
+    results.push(performance.now() - ts);
+    return benchFn(
+      fn, arg, numTests,
+      runSoFar + 1, results,
     );
   }
   return results;
@@ -111,8 +100,6 @@ function render(rootNode, state, subscription) {
 
   const RunActionPerf = evs.action(subscription, {
     type: 'RunActionPerf',
-  }, {
-    foo: 'bar',
   });
 
   const SetActionPerfCount = evs.action(subscription, {
@@ -122,17 +109,22 @@ function render(rootNode, state, subscription) {
 
   const PerfUi = /* html */`
     <form evs.submit="${RunActionPerf}">
+      <div>
+        test count:
+        <input 
+          evs.input="${SetActionPerfCount}"
+          type="number"
+          min="0"
+          max="50"
+          value="${state.actionPerf.count}"
+        />
+      </div>
       <button 
         evs.click="${RunActionPerf}"
         type="button"
       >
         action perf
       </button>
-      <input 
-        evs.input="${SetActionPerfCount}"
-        type="number"
-        value="${state.actionPerf.count}"
-      />
     </form>
   `;
 
@@ -245,10 +237,26 @@ const stateReducers = {
 
 const sideEffects = {
   RunActionPerf(state) {
+    const iterRange = new Array(10).fill(0);
+    const listOfStrings = new Array(400).fill(0).map(() =>
+      Math.random().toString(16).slice(0, 6));
+    // console.log(listOfStrings.join('').length);
+    function actionCreationPerf(
+      subscription,
+    ) {
+      iterRange.forEach(() => {
+        evs.action(subscription, {
+          type: 'setNewTodoText',
+          text: '{inputValue}',
+          listOfStrings,
+        });
+      });
+    }
     const { actionPerf } = state;
-    const results = actionCreationPerf(
-      actionPerf.count,
+    const results = benchFn(
+      actionCreationPerf,
       namespace,
+      actionPerf.count,
     );
     console.log(results);
   },
