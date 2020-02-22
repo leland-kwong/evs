@@ -3,6 +3,7 @@ import { getSupportedEventTypes } from './get-event-types';
 import { nsDelim } from './constants';
 import { uid } from './internal/uid';
 import { encodeAction, decodeAction } from './action-encoder';
+import { string } from './internal/string';
 
 const IS_DEV = process
   && process.env
@@ -131,11 +132,18 @@ function setupGlobalListeners() {
 }
 
 function validateNamespace(namespace) {
+  if (namespace.length === 0) {
+    throw new Error(string([
+      '[invalid namespace] namespace must',
+      'be at least 1 character',
+    ], ' '));
+  }
+
   if (namespace.includes(nsDelim)) {
-    throw new Error([
+    throw new Error(string([
       `[invalid namespace] cannot have \`${nsDelim}\`.`,
       `Received \`${namespace}\`.`,
-    ].join(' '));
+    ], ' '));
   }
 }
 
@@ -170,7 +178,7 @@ const defaults = {
 };
 
 /** creates a unique namespace with a unique id appended */
-function createScope(namespace = 'ns', options) {
+function createScope(namespace, options) {
   validateNamespace(namespace);
 
   const optionsWithDefaults = {
@@ -185,15 +193,7 @@ function createScope(namespace = 'ns', options) {
   };
 
   return {
-    scope,
-    /*
-     * TODO:
-     * Expose a `useAction` and `subscribe` method that
-     * has the scope automatically bound. This way we
-     * don't have to do something like `evs.action(scope, MyAction, ...)`
-     * and can just do `useAction(MyAction, ...)` which is
-     * far more convenient
-     */
+    ...scope,
     withAction: (actionFn, arg, opts) =>
       encodeAction(scope, actionFn, arg, opts),
     subscribe: (onEvent) => {
@@ -209,9 +209,5 @@ function createScope(namespace = 'ns', options) {
 setupGlobalListeners();
 
 export {
-  subscribe,
-  encodeAction as action,
-  dispose,
-  dispatch,
   createScope,
 };

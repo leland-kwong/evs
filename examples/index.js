@@ -94,14 +94,12 @@ function render(rootNode, state) {
         <input
           type="checkbox"
           ${done ? 'checked' : ''}
-          evs.change="
-            ${toggleDone}"
+          evs.change="${toggleDone}"
         />
         <input 
           data-foobar="'>'"
           value="${text}"
-          evs.input="
-            ${editText}"
+          evs.input="${editText}"
         />
       </li>
     `;
@@ -247,7 +245,7 @@ const sideEffects = {
     const iterRange = new Array(100).fill(0);
     const listOfStrings = new Array(200).fill(0).map(() =>
       Math.random().toString(16).slice(0, 6));
-    console.log(listOfStrings.join().length);
+    // console.log(listOfStrings.join().length);
     const actionHandler = (ctx, ev) =>
       ({
         type: 'setNewTodoText',
