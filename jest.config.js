@@ -1,20 +1,11 @@
-// https://github.com/arcatdmz/nextjs-with-jest-typescript
-
 module.exports = {
-  preset: 'ts-jest/presets/js-with-ts',
-  testEnvironment: 'node',
-  moduleFileExtensions: ['ts', 'tsx', 'js'],
-  moduleNameMapper: {
-    // '\\.(css|less)$': '<rootDir>/__mocks__/styleMock.js',
-  },
   transform: {
-    '^.+\\.(ts|tsx)$': 'ts-jest',
+    '^.+\\.[t|j]s?$': 'babel-jest',
   },
-  testMatch: ['**/*.test.(ts|tsx|js|jsx)'],
-  testPathIgnorePatterns: ['./.next/', './node_modules/'],
-  globals: {
-    'ts-jest': {
-      tsConfig: 'tsconfig.jest.json',
-    },
-  },
+  testEnvironment: 'node',
+  moduleFileExtensions: ['js'],
+  moduleNameMapper: {},
+  testMatch: ['**/*.test.(js|jsx)'],
+  testPathIgnorePatterns: ['./node_modules/'],
+  globals: {},
 };

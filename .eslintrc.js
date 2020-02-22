@@ -1,7 +1,7 @@
 module.exports = {
   root: true,
   plugins: [
-    "react-hooks"
+    "jest"
   ],
   extends: [
     'airbnb',
@@ -46,5 +46,8 @@ module.exports = {
       "node_modules",
       "\\.(coffee|scss|css|less|hbs|svg|json)$"
     ]
+  },
+  "env": {
+    "jest/globals": true
   }
 };
