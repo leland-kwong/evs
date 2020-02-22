@@ -4,8 +4,7 @@ import morphdom from 'morphdom';
 import * as evs from '../src/index';
 
 const evScope = evs.createScope('EvsTest');
-const useAction = (actionFn, arg) =>
-  evs.action(evScope, actionFn, arg);
+const { withAction, subscribe } = evScope;
 
 const noop = () => {};
 
@@ -87,31 +86,36 @@ const TodoSetDone = (id, event) =>
 
 function render(rootNode, state) {
   const TodoItem = ([id, { text, done }]) => {
-    const editText = useAction(TodoSetText, id);
-    const toggleDone = useAction(TodoSetDone, id);
+    const editText = withAction(TodoSetText, id);
+    const toggleDone = withAction(TodoSetDone, id);
 
     return /* html */`
       <li>
         <input
           type="checkbox"
           ${done ? 'checked' : ''}
-          evs.change="${toggleDone}"
+          evs.change="
+            ${toggleDone}"
         />
         <input 
           data-foobar="'>'"
           value="${text}"
-          evs.input="${editText}"
+          evs.input="
+            ${editText}"
         />
       </li>
     `;
   };
 
   const PerfUi = /* html */`
-    <form evs.submit="${useAction(RunActionPerf)}">
+    <form evs.submit="
+      ${withAction(RunActionPerf)}"
+    >
       <div>
         test count:
         <input 
-          evs.input="${useAction(SetActionPerfCount)}"
+          evs.input="
+            ${withAction(SetActionPerfCount)}"
           type="number"
           min="0"
           max="50"
@@ -119,7 +123,8 @@ function render(rootNode, state) {
         />
       </div>
       <button 
-        evs.click="${useAction(RunActionPerf)}"
+        evs.click="
+          ${withAction(RunActionPerf)}"
         type="button"
       >
         action perf
@@ -128,9 +133,12 @@ function render(rootNode, state) {
   `;
 
   const NewTodoForm = /* html */`
-    <form evs.submit="${useAction(AddTodo)}">      
+    <form evs.submit="
+      ${withAction(AddTodo)}"
+    >      
       <input
-        evs.input="${useAction(SetNewTodoText)}"
+        evs.input="
+          ${withAction(SetNewTodoText)}"
         value="${state.newTodo.text}"
         placeholder="what needs to be done?"
       />
@@ -240,20 +248,17 @@ const sideEffects = {
     const listOfStrings = new Array(200).fill(0).map(() =>
       Math.random().toString(16).slice(0, 6));
     console.log(listOfStrings.join().length);
-    const actionHandler = (ctx, ev) => {
-      console.log(ctx);
-      return {
+    const actionHandler = (ctx, ev) =>
+      ({
         type: 'setNewTodoText',
         text: ev.target.value,
-      };
-    };
+      });
+    const scope = evs.createScope('testBench');
     // console.log(listOfStrings.join('').length);
     function actionCreationPerf(
-      scope,
     ) {
       iterRange.forEach(() => {
-        evs.action(
-          scope,
+        scope.withAction(
           actionHandler,
           listOfStrings,
         );
@@ -262,7 +267,7 @@ const sideEffects = {
     const { actionPerf } = state;
     const results = benchFn(
       actionCreationPerf,
-      evs.createScope('testBench'),
+      null,
       actionPerf.count,
     );
     console.log(results);
@@ -281,7 +286,7 @@ function init() {
     render($root, state);
   };
 
-  evs.subscribe(evScope, (action, ev) => {
+  subscribe((action, ev) => {
     console.log(action);
     const { type } = action;
     const handler = stateReducers[type];

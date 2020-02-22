@@ -5,8 +5,9 @@ module.exports = {
   ],
   extends: [
     'airbnb',
-    'eslint:recommended',
+    // needed for eslint-airbnb
     'plugin:react/recommended',
+    'eslint:recommended',
   ],
   rules: {
     'implicit-arrow-linebreak': ['error', 'below'],

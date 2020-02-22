@@ -63,7 +63,8 @@ function handleDispatch(ref, refId) {
   }
 
   const domActionData = actionAttr
-    ? actionAttr.value
+    // trim any extraneous white-space
+    ? actionAttr.value.trim()
     : null;
   const namespace = parseActionNamespace(
     domActionData,
@@ -138,6 +139,14 @@ function validateNamespace(namespace) {
   }
 }
 
+function subscribe(scope, onEvent) {
+  const { options, namespace } = scope;
+  const ref = { onEvent, options };
+
+  subscriptions.set(namespace, ref);
+  return `${namespace}-subscription`;
+}
+
 /*
  * TODO:
  * Need a way to also handle scoped document,
@@ -168,10 +177,15 @@ function createScope(namespace = 'ns', options) {
     ...defaults,
     ...options,
   };
+  const uniqueNs = `${namespace}-${uid()}`;
+
+  const scope = {
+    namespace: uniqueNs,
+    options: optionsWithDefaults,
+  };
 
   return {
-    namespace: `${namespace}-${uid()}`,
-    options: optionsWithDefaults,
+    scope,
     /*
      * TODO:
      * Expose a `useAction` and `subscribe` method that
@@ -180,15 +194,16 @@ function createScope(namespace = 'ns', options) {
      * and can just do `useAction(MyAction, ...)` which is
      * far more convenient
      */
+    withAction: (actionFn, arg, opts) =>
+      encodeAction(scope, actionFn, arg, opts),
+    subscribe: (onEvent) => {
+      const subscription = subscribe(scope, onEvent);
+
+      return function unsubscribe() {
+        dispose(subscription);
+      };
+    },
   };
-}
-
-function subscribe(scope, onEvent) {
-  const { options, namespace } = scope;
-  const ref = { onEvent, options };
-
-  subscriptions.set(namespace, ref);
-  return `${namespace}-subscription`;
 }
 
 setupGlobalListeners();

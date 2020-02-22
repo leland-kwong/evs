@@ -12,6 +12,22 @@ const registeredActionFns = new Map();
 const identity = (v) =>
   v;
 
+function validateDuplicateActionFn(fnId, fn) {
+  const fromBefore = registeredActionFns.has(fnId)
+    ? registeredActionFns.get(fnId)
+    : null;
+  const isDuplicate = fromBefore
+    && fn !== fromBefore;
+
+  if (isDuplicate) {
+    throw new Error(string([
+      '[Duplicate function name] Encountered two different',
+      'functions with the same name. The functions are:\n',
+      `${fromBefore}\n${fn}`,
+    ], ' '));
+  }
+}
+
 function registerActionFn(namespace, fn) {
   if (typeof fn !== 'function') {
     const errorMessage = string([
@@ -31,6 +47,11 @@ function registerActionFn(namespace, fn) {
   }
 
   const fnId = `${fn.name}--${namespace}`;
+  validateDuplicateActionFn(
+    fnId,
+    fn,
+  );
+
   registeredActionFns.set(fnId, fn);
   return fnId;
 }
