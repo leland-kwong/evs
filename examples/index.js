@@ -291,7 +291,7 @@ function init() {
     render($root, state);
   };
 
-  evScope.subscribe((action, ev) => {
+  const unsubscribe = evScope.subscribe((action, ev) => {
     console.log(action);
     const { type } = action;
     const handler = stateReducers[type];
@@ -309,6 +309,8 @@ function init() {
 
     update(handler(state, action));
   });
+
+  unsubscribe();
 
   update(state);
 }

@@ -19,20 +19,6 @@ const nodeTypes = {
   element: 1,
 };
 
-const rootSubscriptions = new Map();
-
-function subscribe(scope, onEvent) {
-  const { options, namespace } = scope;
-  const ref = { onEvent, options };
-
-  rootSubscriptions.set(namespace, ref);
-  return `${namespace}-subscription`;
-}
-
-function dispose(ref) {
-  rootSubscriptions.delete(ref);
-}
-
 function parseActionNamespace(rawData) {
   return rawData
     ? rawData.slice(
@@ -54,12 +40,11 @@ function getActionAttr(DOMTarget, attrName) {
   return attributes[attrName];
 }
 
-function handleDispatch(ref, refId) {
-  const { options, onEvent } = ref;
+function handleDispatch(event, onEvent, options, refId) {
   const {
     eventAttributePrefix,
   } = options;
-  const { type, target } = this;
+  const { type, target } = event;
   const normalizedType = mapEventType[type]
    || type;
   const actionAttr = getActionAttr(
@@ -87,16 +72,10 @@ function handleDispatch(ref, refId) {
   const parsed = decodeAction(
     domActionData,
     undefined,
-    this,
+    event,
   );
 
-  onEvent(parsed, this);
-}
-
-/* dispatches the dom event to subscribers */
-function dispatch(ev) {
-  rootSubscriptions
-    .forEach(handleDispatch, ev);
+  onEvent(parsed, event);
 }
 
 function ignoreBuggyEvents(type) {
@@ -119,22 +98,13 @@ function ignoreBuggyEvents(type) {
   return !filterRe.test(type);
 }
 
-function setupGlobalListeners() {
-  const eventTypes = [
-    ...getSupportedEventTypes(),
-    'focusin',
-    'focusout',
-  ].filter(ignoreBuggyEvents);
-
-  // remove any previously applied global listeners
+function setupGlobalListeners(
+  dispatch,
+  eventTypes,
+  method = 'addEventListener',
+) {
   eventTypes.forEach((eventName) => {
-    document.removeEventListener(
-      eventName, dispatch,
-    );
-  });
-
-  eventTypes.forEach((eventName) => {
-    document.addEventListener(
+    document[method](
       eventName, dispatch,
     );
   });
@@ -171,8 +141,6 @@ const defaults = {
 
 /** creates a namespace with a unique id appended */
 function createScope(namespace, options) {
-  validateNamespace(namespace);
-
   const optionsWithDefaults = {
     ...defaults,
     ...options,
@@ -184,12 +152,29 @@ function createScope(namespace, options) {
     options: optionsWithDefaults,
     _subscriptions: subscriptions,
   };
+  const domEventTypes = [
+    ...getSupportedEventTypes(),
+    'focusin',
+    'focusout',
+  ].filter(ignoreBuggyEvents);
 
   function rootSubscriber(a, b) {
     subscriptions
       .forEach((fn) =>
         fn(a, b));
   }
+
+  function dispatch(DOMEvent) {
+    handleDispatch(
+      DOMEvent,
+      rootSubscriber,
+      optionsWithDefaults,
+      uniqueNs,
+    );
+  }
+
+  setupGlobalListeners(dispatch, domEventTypes);
+  validateNamespace(namespace);
 
   return {
     ...scope,
@@ -198,21 +183,19 @@ function createScope(namespace, options) {
     subscribe: (onEvent) => {
       subscriptions.push(onEvent);
 
-      const rootSub = subscribe(scope, rootSubscriber);
-
       return function unsubscribe() {
-        const index = rootSubscriptions
+        const index = subscriptions
           .findIndex(onEvent);
 
         subscriptions.splice(index, 1);
-
-        const noSubsLeft = subscriptions.length
-          === 0;
-
-        if (noSubsLeft) {
-          dispose(rootSub);
-        }
       };
+    },
+    destroy: () => {
+      setupGlobalListeners(
+        dispatch,
+        domEventTypes,
+        'removeEventListener',
+      );
     },
   };
 }
@@ -222,8 +205,6 @@ function info() {
     registeredFns,
   };
 }
-
-setupGlobalListeners();
 
 export {
   createScope,
