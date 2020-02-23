@@ -5,7 +5,8 @@ import * as evs from '../src/index';
 
 const evScope = evs.createScope('EvsTest');
 
-const noop = () => {};
+const noop = () =>
+  ({ type: '@noop' });
 
 const makeUniqueElement = (id = 'some-id', tagType = 'div') => {
   const fromBefore = document.querySelector(id);
@@ -140,7 +141,13 @@ function render(rootNode, state) {
           value="${state.actionPerf.count}"
         />
       </div>
-      <button type="submit">
+      <button 
+        type="submit"
+        evs.click="${evScope.call(
+          noop,
+          evs.InputValue,
+        )}"
+      >
         action perf
       </button>
     </form>
