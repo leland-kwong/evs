@@ -1,6 +1,6 @@
 /* global document */
 import { getSupportedEventTypes } from './get-event-types';
-import { nsDelim } from './constants';
+import { nsDelim, isBrowser } from './constants';
 import { uid } from './internal/uid';
 import {
   encodeAction,
@@ -40,6 +40,15 @@ function setupGlobalListeners(
   eventTypes,
   method = 'addEventListener',
 ) {
+  /**
+   * Server-side rendering has no dom events
+   * so we should skip this and still enable
+   * the html event scoping to still work.
+   */
+  if (!isBrowser) {
+    return;
+  }
+
   eventTypes.forEach((eventName) => {
     document[method](
       eventName, onDomEvent,
@@ -62,10 +71,6 @@ function validateNamespace(namespace) {
     ], ' '));
   }
 }
-
-const defaults = {
-  eventAttributePrefix: 'evs.',
-};
 
 function findThis(v) {
   return this === v;
@@ -132,13 +137,28 @@ function dispatch(domEvent, scope, subscriptions) {
   }
 }
 
-/** creates a namespace with a unique id appended */
+const defaults = {
+  eventAttributePrefix: 'evs.',
+  /**
+   * Useful for isomorphic rendering where
+   * you'd want the same namespace on both
+   * the server and client.
+   */
+  useAbsoluteNamespace: false,
+};
+
 function createScope(namespace, options) {
   const optionsWithDefaults = {
     ...defaults,
     ...options,
   };
-  const uniqueNs = `${namespace}-${uid()}`;
+  const {
+    useAbsoluteNamespace,
+  } = optionsWithDefaults;
+  const uniqueNs = useAbsoluteNamespace
+    ? namespace
+    // prevent namespace collisions
+    : `${namespace}-${uid()}`;
   const subscriptions = [];
   const scope = {
     namespace: uniqueNs,
