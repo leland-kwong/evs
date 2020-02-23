@@ -167,20 +167,6 @@ function contextReviver(key, value) {
   return value;
 }
 
-function triggerEventOptions(opts, event) {
-  const {
-    preventDefault, stopPropagation,
-  } = opts;
-
-  if (preventDefault) {
-    event.preventDefault();
-  }
-
-  if (stopPropagation) {
-    event.stopPropagation();
-  }
-}
-
 export function decodeAction(
   rawData,
   event,
@@ -199,10 +185,7 @@ export function decodeAction(
   );
   const actionFn = getRegisteredAction(rawAction);
 
-  triggerEventOptions(eventOpts, event);
-  // TODO: simulate event bubbling by walking up the path
-
-  return actionFn(context);
+  return [actionFn(context), eventOpts];
 }
 
 function parseActionNamespace(rawData) {
@@ -227,12 +210,15 @@ function getActionAttr(DOMTarget, attrName) {
 }
 
 export function handleDispatch(
-  event, onEvent, scopeOptions, refId,
+  syntheticEvent,
+  originalEvent,
+  scopeOptions,
+  refId,
 ) {
   const {
     eventAttributePrefix,
   } = scopeOptions;
-  const { type, target } = event;
+  const { type, target } = syntheticEvent;
   const normalizedType = mapEventType[type]
    || type;
   const actionAttr = getActionAttr(
@@ -241,7 +227,7 @@ export function handleDispatch(
   );
 
   if (!actionAttr) {
-    return;
+    return null;
   }
 
   const domActionData = actionAttr
@@ -254,16 +240,11 @@ export function handleDispatch(
   const isNamespaceMatch = namespace === refId;
 
   if (!isNamespaceMatch) {
-    return;
+    return null;
   }
 
-  const parsed = decodeAction(
+  return decodeAction(
     domActionData,
-    event,
-    scopeOptions,
-    onEvent,
-    refId,
+    originalEvent,
   );
-
-  onEvent(parsed, event);
 }

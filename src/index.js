@@ -29,14 +29,20 @@ function ignoreBuggyEvents(type) {
   return !filterRe.test(type);
 }
 
+const domEventTypes = [
+  ...getSupportedEventTypes(),
+  'focusin',
+  'focusout',
+].filter(ignoreBuggyEvents);
+
 function setupGlobalListeners(
-  dispatch,
+  onDomEvent,
   eventTypes,
   method = 'addEventListener',
 ) {
   eventTypes.forEach((eventName) => {
     document[method](
-      eventName, dispatch,
+      eventName, onDomEvent,
     );
   });
 }
@@ -57,21 +63,73 @@ function validateNamespace(namespace) {
   }
 }
 
-/*
- * TODO:
- * Need a way to also handle scoped document,
- * html, and body element events. The reason this
- * is tricky is these elements are globally shared.
- * One way is to provide a custom callback options
- * such as `onDocumentEvent` and `onBodyEvent`.
- */
-
 const defaults = {
   eventAttributePrefix: 'evs.',
 };
 
-function findOnEvent(fn) {
-  return this === fn;
+function findThis(v) {
+  return this === v;
+}
+
+function rootSubscriber(action, event, subscriptions) {
+  subscriptions
+    .forEach((fn) =>
+      fn(action, event));
+}
+
+function dispatch(domEvent, scope, subscriptions) {
+  const { type: eventType } = domEvent;
+  const syntheticEvent = {
+    type: eventType,
+  };
+  const { path } = domEvent;
+
+  /**
+   * Simulate bubbling by walking up the
+   * dom event path.
+   */
+  let i = 0;
+  while (i < path.length) {
+    const node = path[i];
+    syntheticEvent.target = node;
+
+    const response = handleDispatch(
+      syntheticEvent,
+      domEvent,
+      scope.options,
+      scope.namespace,
+    );
+    const hasResponse = response !== null;
+
+    if (hasResponse) {
+      const [
+        parsedAction,
+        actionOpts,
+      ] = response;
+
+      rootSubscriber(
+        parsedAction,
+        domEvent,
+        subscriptions,
+      );
+
+      const {
+        stopPropagation,
+        preventDefault,
+      } = actionOpts;
+
+      if (preventDefault) {
+        domEvent.preventDefault();
+      }
+
+      // simulate event.stopPropagation()
+      if (stopPropagation) {
+        return;
+      }
+    }
+    // continue to next node up the path
+    i += 1;
+  }
 }
 
 /** creates a namespace with a unique id appended */
@@ -87,28 +145,10 @@ function createScope(namespace, options) {
     options: optionsWithDefaults,
     _subscriptions: subscriptions,
   };
-  const domEventTypes = [
-    ...getSupportedEventTypes(),
-    'focusin',
-    'focusout',
-  ].filter(ignoreBuggyEvents);
 
-  function rootSubscriber(a, b) {
-    subscriptions
-      .forEach((fn) =>
-        fn(a, b));
-  }
-
-  function dispatch(DOMEvent) {
-    handleDispatch(
-      DOMEvent,
-      rootSubscriber,
-      optionsWithDefaults,
-      uniqueNs,
-    );
-  }
-
-  setupGlobalListeners(dispatch, domEventTypes);
+  setupGlobalListeners((domEvent) => {
+    dispatch(domEvent, scope, subscriptions);
+  }, domEventTypes);
   validateNamespace(namespace);
 
   return {
@@ -120,7 +160,7 @@ function createScope(namespace, options) {
 
       return function unsubscribe() {
         const index = subscriptions
-          .findIndex(findOnEvent, onEvent);
+          .findIndex(findThis, onEvent);
         subscriptions.splice(index, 1);
       };
     },

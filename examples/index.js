@@ -83,10 +83,10 @@ const TodoSetDone = ({ id, done }) =>
     id,
   });
 
-const TestBubbling = (ev) => {
-  console.log('[test bubbling]', ev);
-  return {};
-};
+const TestBubbling = () =>
+  ({
+    type: 'TestBubbling',
+  });
 
 function render(rootNode, state) {
   const TodoItem = ([id, { text, done }]) => {
@@ -135,15 +135,12 @@ function render(rootNode, state) {
             evs.InputNumberValue,
           )}"
           type="number"
-          min="0"
+          min="1"
           max="50"
           value="${state.actionPerf.count}"
         />
       </div>
-      <button 
-        evs.click="${evScope.call(RunActionPerf)}"
-        type="button"
-      >
+      <button type="submit">
         action perf
       </button>
     </form>
@@ -314,15 +311,16 @@ function init() {
   const unsubscribe = evScope.subscribe((action) => {
     console.log(action);
     const { type } = action;
-    const handler = stateReducers[type];
+
     const effectFn = sideEffects[type] || noop;
     effectFn(state, action);
 
-    if (!handler) {
+    const reducer = stateReducers[type];
+    if (!reducer) {
       return;
     }
 
-    update(handler(state, action));
+    update(reducer(state, action));
   });
 
   // unsubscribe();

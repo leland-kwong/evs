@@ -23,7 +23,7 @@ describe('action encoder', () => {
     const encoded = encodeAction(
       ns, SomeAction, context,
     );
-    const decoded = decodeAction(
+    const [decoded] = decodeAction(
       encoded, undefined, null,
     );
 
