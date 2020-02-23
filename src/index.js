@@ -2,12 +2,12 @@
 import { getSupportedEventTypes } from './get-event-types';
 import { nsDelim } from './constants';
 import { uid } from './internal/uid';
-import { encodeAction, decodeAction } from './action-encoder';
+import {
+  encodeAction,
+  decodeAction,
+  registeredFns,
+} from './action-encoder';
 import { string } from './internal/string';
-
-const IS_DEV = process
-  && process.env
-  && process.env.NODE_ENV === 'development';
 
 const mapEventType = {
   focusin: 'focus',
@@ -19,10 +19,18 @@ const nodeTypes = {
   element: 1,
 };
 
-const subscriptions = new Map();
+const rootSubscriptions = new Map();
+
+function subscribe(scope, onEvent) {
+  const { options, namespace } = scope;
+  const ref = { onEvent, options };
+
+  rootSubscriptions.set(namespace, ref);
+  return `${namespace}-subscription`;
+}
 
 function dispose(ref) {
-  subscriptions.delete(ref);
+  rootSubscriptions.delete(ref);
 }
 
 function parseActionNamespace(rawData) {
@@ -76,7 +84,6 @@ function handleDispatch(ref, refId) {
     return;
   }
 
-
   const parsed = decodeAction(
     domActionData,
     undefined,
@@ -88,7 +95,8 @@ function handleDispatch(ref, refId) {
 
 /* dispatches the dom event to subscribers */
 function dispatch(ev) {
-  subscriptions.forEach(handleDispatch, ev);
+  rootSubscriptions
+    .forEach(handleDispatch, ev);
 }
 
 function ignoreBuggyEvents(type) {
@@ -102,7 +110,8 @@ function ignoreBuggyEvents(type) {
     'pointerrawupdate',
   ];
 
-  if (IS_DEV && !eventsToIgnore.length) {
+  if (process.env.NODE_ENV === 'development'
+      && !eventsToIgnore.length) {
     return true;
   }
 
@@ -147,14 +156,6 @@ function validateNamespace(namespace) {
   }
 }
 
-function subscribe(scope, onEvent) {
-  const { options, namespace } = scope;
-  const ref = { onEvent, options };
-
-  subscriptions.set(namespace, ref);
-  return `${namespace}-subscription`;
-}
-
 /*
  * TODO:
  * Need a way to also handle scoped document,
@@ -162,22 +163,13 @@ function subscribe(scope, onEvent) {
  * is tricky is these elements are globally shared.
  * One way is to provide a custom callback options
  * such as `onDocumentEvent` and `onBodyEvent`.
- *
- * TODO:
- * Add option for validating the encoded data. We
- * can set a meaningful default that limits the
- * encoded size to X characters so that the
- * decoding and parsing can remain snappy.
- *
- * TODO:
- * Consider an option for a custom data decoder.
  */
 
 const defaults = {
   eventAttributePrefix: 'evs.',
 };
 
-/** creates a unique namespace with a unique id appended */
+/** creates a namespace with a unique id appended */
 function createScope(namespace, options) {
   validateNamespace(namespace);
 
@@ -186,23 +178,48 @@ function createScope(namespace, options) {
     ...options,
   };
   const uniqueNs = `${namespace}-${uid()}`;
-
+  const subscriptions = [];
   const scope = {
     namespace: uniqueNs,
     options: optionsWithDefaults,
+    _subscriptions: subscriptions,
   };
+
+  function rootSubscriber(a, b) {
+    subscriptions
+      .forEach((fn) =>
+        fn(a, b));
+  }
 
   return {
     ...scope,
-    withAction: (actionFn, arg, opts) =>
+    call: (actionFn, arg, opts) =>
       encodeAction(scope, actionFn, arg, opts),
     subscribe: (onEvent) => {
-      const subscription = subscribe(scope, onEvent);
+      subscriptions.push(onEvent);
+
+      const rootSub = subscribe(scope, rootSubscriber);
 
       return function unsubscribe() {
-        dispose(subscription);
+        const index = rootSubscriptions
+          .findIndex(onEvent);
+
+        subscriptions.splice(index, 1);
+
+        const noSubsLeft = subscriptions.length
+          === 0;
+
+        if (noSubsLeft) {
+          dispose(rootSub);
+        }
       };
     },
+  };
+}
+
+function info() {
+  return {
+    registeredFns,
   };
 }
 
@@ -210,4 +227,7 @@ setupGlobalListeners();
 
 export {
   createScope,
+  info,
 };
+
+export * from './internal/event-helpers';

@@ -6,21 +6,29 @@ import {
 import { string } from './internal/string';
 
 let encoderLengthWarned = false;
+let domEventContext;
 
-const registeredActionFns = new Map();
+export const registeredFns = new Map();
 
 const identity = (v) =>
   v;
 
-function validateDuplicateActionFn(fnId, fn) {
-  const fromBefore = registeredActionFns.has(fnId)
-    ? registeredActionFns.get(fnId)
+const isFunc = (v) =>
+  typeof v === 'function';
+
+function evsError(stringsList) {
+  return `[evs error]${string(stringsList)}`;
+}
+
+function checkDuplicateFn(fnId, fn) {
+  const fromBefore = registeredFns.has(fnId)
+    ? registeredFns.get(fnId)
     : null;
   const isDuplicate = fromBefore
     && fn !== fromBefore;
 
   if (isDuplicate) {
-    throw new Error(string([
+    throw new Error(evsError([
       '[Duplicate function name] Encountered two different',
       'functions with the same name. The functions are:\n',
       `${fromBefore}\n${fn}`,
@@ -28,9 +36,9 @@ function validateDuplicateActionFn(fnId, fn) {
   }
 }
 
-function registerActionFn(namespace, fn) {
-  if (typeof fn !== 'function') {
-    const errorMessage = string([
+function registerFn(namespace, fn) {
+  if (!isFunc(fn)) {
+    const errorMessage = evsError([
       'Actions must be be named functions.',
       `Receieved: ${fn}`,
     ], ' ');
@@ -40,24 +48,27 @@ function registerActionFn(namespace, fn) {
   const fnName = fn.name;
 
   if (fnName.length === 0) {
-    throw new Error(string([
+    throw new Error(evsError([
       'Anonymous functions may not be used',
       'as actions',
     ]));
   }
 
   const fnId = `${fn.name}--${namespace}`;
-  validateDuplicateActionFn(
-    fnId,
-    fn,
-  );
 
-  registeredActionFns.set(fnId, fn);
+  if (process.env.NODE_ENV === 'development') {
+    checkDuplicateFn(
+      fnId,
+      fn,
+    );
+  }
+
+  registeredFns.set(fnId, fn);
   return fnId;
 }
 
 function getRegisteredAction(fnIdOrInlineAction) {
-  return registeredActionFns
+  return registeredFns
     .get(fnIdOrInlineAction);
 }
 
@@ -82,7 +93,15 @@ function validateAction(encodedAction, action) {
   return encodedAction;
 }
 
-const actionSplitter = '__::evs.action::__';
+const actionSplitter = '__evs.action__';
+
+function contextReplacer(key, value) {
+  if (isFunc(value)) {
+    return registerFn('evs.context', value);
+  }
+
+  return value;
+}
 
 /**
  * Generates namespaced html data to be used
@@ -111,37 +130,18 @@ export function encodeAction(
    * }
    * evs.action(scope, Action, null, options)
    * ```
-   *
-   * TODO:
-   * Add support for special context functions to
-   * handle common things like event values, mouse
-   * coordinates etc... The way it can work is any
-   * function identifiers that are found in the context
-   * are called with the current event.
-   *
-   * We can do this by doing something like:
-   * ```js
-   * function InputValue(ev) {
-   *  return ev.target.value
-   * }
-   *
-   * function Action(inputText) {
-   *  return {
-   *    type: 'Action',
-   *    text: inputText
-   *  }
-   * }
-   *
-   * evs.action(scope, Action, InputValue)
-   * ```
    * */
 ) {
   const {
     namespace,
   } = scope;
   // encoded to make it html attribute friendly
-  const rawAction = registerActionFn(namespace, actionFn);
-  const rawContext = JSON.stringify(context);
+  const rawAction = registerFn(namespace, actionFn);
+  const rawContext = JSON.stringify(
+    context,
+    contextReplacer,
+    2,
+  );
   const data = validateAction(
     encoder(
       string([
@@ -156,11 +156,23 @@ export function encodeAction(
   return `${namespace}${nsDelim}${data}`;
 }
 
+function contextReviver(key, value) {
+  const eventReducer = getRegisteredAction(value);
+
+  if (eventReducer) {
+    return eventReducer(domEventContext);
+  }
+
+  return value;
+}
+
 export function decodeAction(
   rawData,
   decoder = identity,
   event,
 ) {
+  domEventContext = event;
+
   const encodedAction = rawData.slice(
     rawData.indexOf(nsDelim) + nsDelim.length,
   );
@@ -168,9 +180,10 @@ export function decodeAction(
     rawAction, rawContext,
   ] = decoder(encodedAction)
     .split(actionSplitter);
-  const context = JSON.parse(rawContext);
-  const actionFn = getRegisteredAction(rawAction)
-    // eslint-disable-next-line no-new-func
-    || Function(rawAction)();
+  const context = JSON.parse(
+    rawContext, contextReviver,
+  );
+  const actionFn = getRegisteredAction(rawAction);
+
   return actionFn(context, event);
 }

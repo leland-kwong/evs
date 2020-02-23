@@ -4,7 +4,6 @@ import morphdom from 'morphdom';
 import * as evs from '../src/index';
 
 const evScope = evs.createScope('EvsTest');
-const { withAction, subscribe } = evScope;
 
 const noop = () => {};
 
@@ -44,10 +43,10 @@ function benchFn(
   return results;
 }
 
-const SetNewTodoText = (ctx, ev) =>
+const SetNewTodoText = (text) =>
   ({
     type: 'SetNewTodoText',
-    text: ev.target.value,
+    text,
   });
 
 const AddTodo = () =>
@@ -60,34 +59,40 @@ const RunActionPerf = () =>
     type: 'RunActionPerf',
   });
 
-const SetActionPerfCount = (ctx, ev) =>
+const SetActionPerfCount = (count) =>
   ({
     type: 'SetActionPerfCount',
-    count: ev.target.value,
+    count,
   });
 
-const TodoSetText = (id, event) =>
+const TodoSetText = ({ id, text }) =>
   ({
     type: 'EditTodo',
     changes: {
-      text: event.target.value,
+      text,
     },
     id,
   });
 
-const TodoSetDone = (id, event) =>
+const TodoSetDone = ({ id, done }) =>
   ({
     type: 'EditTodo',
     changes: {
-      done: event.target.checked,
+      done,
     },
     id,
   });
 
 function render(rootNode, state) {
   const TodoItem = ([id, { text, done }]) => {
-    const editText = withAction(TodoSetText, id);
-    const toggleDone = withAction(TodoSetDone, id);
+    const editText = evScope.call(
+      TodoSetText,
+      { id, text: evs.InputValue },
+    );
+    const toggleDone = evScope.call(
+      TodoSetDone,
+      { id, done: evs.InputChecked },
+    );
 
     return /* html */`
       <li>
@@ -107,13 +112,13 @@ function render(rootNode, state) {
 
   const PerfUi = /* html */`
     <form evs.submit="
-      ${withAction(RunActionPerf)}"
+      ${evScope.call(RunActionPerf)}"
     >
       <div>
         test count:
         <input 
           evs.input="
-            ${withAction(SetActionPerfCount)}"
+            ${evScope.call(SetActionPerfCount, evs.InputValue)}"
           type="number"
           min="0"
           max="50"
@@ -122,7 +127,7 @@ function render(rootNode, state) {
       </div>
       <button 
         evs.click="
-          ${withAction(RunActionPerf)}"
+          ${evScope.call(RunActionPerf)}"
         type="button"
       >
         action perf
@@ -132,11 +137,11 @@ function render(rootNode, state) {
 
   const NewTodoForm = /* html */`
     <form evs.submit="
-      ${withAction(AddTodo)}"
+      ${evScope.call(AddTodo)}"
     >      
       <input
         evs.input="
-          ${withAction(SetNewTodoText)}"
+          ${evScope.call(SetNewTodoText, evs.InputValue)}"
         value="${state.newTodo.text}"
         placeholder="what needs to be done?"
       />
@@ -207,11 +212,13 @@ const stateReducers = {
     };
   },
   SetNewTodoText(state, action) {
+    const { text } = action;
+
     return {
       ...state,
       newTodo: {
         ...state.newTodo,
-        text: action.text,
+        text,
       },
     };
   },
@@ -244,19 +251,19 @@ const sideEffects = {
   RunActionPerf(state) {
     const iterRange = new Array(100).fill(0);
     const listOfStrings = new Array(200).fill(0).map(() =>
-      Math.random().toString(16).slice(0, 6));
+      Math.random().toString(16).slice(0, 10));
     // console.log(listOfStrings.join().length);
-    const actionHandler = (ctx, ev) =>
+    const actionHandler = (text) =>
       ({
         type: 'setNewTodoText',
-        text: ev.target.value,
+        text,
       });
     const scope = evs.createScope('testBench');
     // console.log(listOfStrings.join('').length);
     function actionCreationPerf(
     ) {
       iterRange.forEach(() => {
-        scope.withAction(
+        scope.call(
           actionHandler,
           listOfStrings,
         );
@@ -284,7 +291,7 @@ function init() {
     render($root, state);
   };
 
-  subscribe((action, ev) => {
+  evScope.subscribe((action, ev) => {
     console.log(action);
     const { type } = action;
     const handler = stateReducers[type];
