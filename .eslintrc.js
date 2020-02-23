@@ -25,6 +25,11 @@ module.exports = {
         mjs: 'never',
         jsx: 'never',
       }
+    ],
+    "indent": [
+      "error", 
+      2, 
+      { "ignoredNodes": ["TemplateLiteral > *"] }
     ]
   },
   "settings": {

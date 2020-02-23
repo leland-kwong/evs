@@ -83,6 +83,11 @@ const TodoSetDone = ({ id, done }) =>
     id,
   });
 
+const TestBubbling = (ev) => {
+  console.log('[test bubbling]', ev);
+  return {};
+};
+
 function render(rootNode, state) {
   const TodoItem = ([id, { text, done }]) => {
     const editText = evScope.call(
@@ -111,14 +116,24 @@ function render(rootNode, state) {
   };
 
   const PerfUi = /* html */`
-    <form evs.submit="
-      ${evScope.call(RunActionPerf)}"
+    <form 
+      evs.submit="${evScope.call(
+        RunActionPerf,
+        null,
+        { preventDefault: true },
+      )}"
+      evs.click="${evScope.call(
+        TestBubbling,
+        evs.InputValue,
+      )}"
     >
       <div>
         test count:
         <input 
-          evs.input="
-            ${evScope.call(SetActionPerfCount, evs.InputValue)}"
+          evs.input="${evScope.call(
+            SetActionPerfCount,
+            evs.InputNumberValue,
+          )}"
           type="number"
           min="0"
           max="50"
@@ -126,8 +141,7 @@ function render(rootNode, state) {
         />
       </div>
       <button 
-        evs.click="
-          ${evScope.call(RunActionPerf)}"
+        evs.click="${evScope.call(RunActionPerf)}"
         type="button"
       >
         action perf
@@ -136,12 +150,18 @@ function render(rootNode, state) {
   `;
 
   const NewTodoForm = /* html */`
-    <form evs.submit="
-      ${evScope.call(AddTodo)}"
+    <form 
+      evs.submit="${evScope.call(
+        AddTodo,
+        null,
+        { preventDefault: true },
+      )}"
     >      
       <input
-        evs.input="
-          ${evScope.call(SetNewTodoText, evs.InputValue)}"
+        evs.input="${evScope.call(
+          SetNewTodoText,
+          evs.InputValue,
+        )}"
         value="${state.newTodo.text}"
         placeholder="what needs to be done?"
       />
@@ -291,15 +311,10 @@ function init() {
     render($root, state);
   };
 
-  const unsubscribe = evScope.subscribe((action, ev) => {
+  const unsubscribe = evScope.subscribe((action) => {
     console.log(action);
     const { type } = action;
     const handler = stateReducers[type];
-
-    if (ev.type === 'submit') {
-      ev.preventDefault();
-    }
-
     const effectFn = sideEffects[type] || noop;
     effectFn(state, action);
 
@@ -310,7 +325,7 @@ function init() {
     update(handler(state, action));
   });
 
-  unsubscribe();
+  // unsubscribe();
 
   update(state);
 }

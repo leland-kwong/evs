@@ -10,6 +10,16 @@ let domEventContext;
 
 export const registeredFns = new Map();
 
+const mapEventType = {
+  focusin: 'focus',
+  focusout: 'blur',
+};
+
+const nodeTypes = {
+  document: 9,
+  element: 1,
+};
+
 const identity = (v) =>
   v;
 
@@ -111,26 +121,17 @@ export function encodeAction(
   scope,
   actionFn,
   context = null,
+  /*
+   * TODO:
+   * Add support for additional options:
+   *
+   * - bubbles: boolean
+   * - capture: boolean
+   * */
+  eventOpts = {},
   encoder = isBrowser
     ? htmlEscaper.escape
     : identity,
-  /*
-   * TODO:
-   * Add support for additional options such as:
-   *
-   * - preventDefault: boolean
-   * - stopPropagation: boolean
-   * - bubbles: boolean
-   * - capture: boolean
-   *
-   * We can provide them like so:
-   * ```js
-   * const options = {
-   *  preventDefault: true
-   * }
-   * evs.action(scope, Action, null, options)
-   * ```
-   * */
 ) {
   const {
     namespace,
@@ -138,7 +139,7 @@ export function encodeAction(
   // encoded to make it html attribute friendly
   const rawAction = registerFn(namespace, actionFn);
   const rawContext = JSON.stringify(
-    context,
+    { context, eventOpts },
     contextReplacer,
     2,
   );
@@ -166,9 +167,22 @@ function contextReviver(key, value) {
   return value;
 }
 
+function triggerEventOptions(opts, event) {
+  const {
+    preventDefault, stopPropagation,
+  } = opts;
+
+  if (preventDefault) {
+    event.preventDefault();
+  }
+
+  if (stopPropagation) {
+    event.stopPropagation();
+  }
+}
+
 export function decodeAction(
   rawData,
-  decoder = identity,
   event,
 ) {
   domEventContext = event;
@@ -177,13 +191,79 @@ export function decodeAction(
     rawData.indexOf(nsDelim) + nsDelim.length,
   );
   const [
-    rawAction, rawContext,
-  ] = decoder(encodedAction)
-    .split(actionSplitter);
-  const context = JSON.parse(
+    rawAction,
+    rawContext,
+  ] = encodedAction.split(actionSplitter);
+  const { context, eventOpts } = JSON.parse(
     rawContext, contextReviver,
   );
   const actionFn = getRegisteredAction(rawAction);
 
-  return actionFn(context, event);
+  triggerEventOptions(eventOpts, event);
+  // TODO: simulate event bubbling by walking up the path
+
+  return actionFn(context);
+}
+
+function parseActionNamespace(rawData) {
+  return rawData
+    ? rawData.slice(
+      0, rawData.indexOf(nsDelim),
+    )
+    : '';
+}
+
+function getActionAttr(DOMTarget, attrName) {
+  const isDOMElement = DOMTarget
+    ? DOMTarget.nodeType === nodeTypes.element
+    : false;
+
+  if (!isDOMElement) {
+    return null;
+  }
+
+  const { attributes } = DOMTarget;
+  return attributes[attrName];
+}
+
+export function handleDispatch(
+  event, onEvent, scopeOptions, refId,
+) {
+  const {
+    eventAttributePrefix,
+  } = scopeOptions;
+  const { type, target } = event;
+  const normalizedType = mapEventType[type]
+   || type;
+  const actionAttr = getActionAttr(
+    target,
+    `${eventAttributePrefix}${normalizedType}`,
+  );
+
+  if (!actionAttr) {
+    return;
+  }
+
+  const domActionData = actionAttr
+    // trim any extraneous white-space
+    ? actionAttr.value.trim()
+    : null;
+  const namespace = parseActionNamespace(
+    domActionData,
+  );
+  const isNamespaceMatch = namespace === refId;
+
+  if (!isNamespaceMatch) {
+    return;
+  }
+
+  const parsed = decodeAction(
+    domActionData,
+    event,
+    scopeOptions,
+    onEvent,
+    refId,
+  );
+
+  onEvent(parsed, event);
 }

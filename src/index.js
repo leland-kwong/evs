@@ -4,79 +4,10 @@ import { nsDelim } from './constants';
 import { uid } from './internal/uid';
 import {
   encodeAction,
-  decodeAction,
+  handleDispatch,
   registeredFns,
 } from './action-encoder';
 import { string } from './internal/string';
-
-const mapEventType = {
-  focusin: 'focus',
-  focusout: 'blur',
-};
-
-const nodeTypes = {
-  document: 9,
-  element: 1,
-};
-
-function parseActionNamespace(rawData) {
-  return rawData
-    ? rawData.slice(
-      0, rawData.indexOf(nsDelim),
-    )
-    : '';
-}
-
-function getActionAttr(DOMTarget, attrName) {
-  const isDOMElement = DOMTarget
-    ? DOMTarget.nodeType === nodeTypes.element
-    : false;
-
-  if (!isDOMElement) {
-    return null;
-  }
-
-  const { attributes } = DOMTarget;
-  return attributes[attrName];
-}
-
-function handleDispatch(event, onEvent, options, refId) {
-  const {
-    eventAttributePrefix,
-  } = options;
-  const { type, target } = event;
-  const normalizedType = mapEventType[type]
-   || type;
-  const actionAttr = getActionAttr(
-    target,
-    `${eventAttributePrefix}${normalizedType}`,
-  );
-
-  if (!actionAttr) {
-    return;
-  }
-
-  const domActionData = actionAttr
-    // trim any extraneous white-space
-    ? actionAttr.value.trim()
-    : null;
-  const namespace = parseActionNamespace(
-    domActionData,
-  );
-  const isNamespaceMatch = namespace === refId;
-
-  if (!isNamespaceMatch) {
-    return;
-  }
-
-  const parsed = decodeAction(
-    domActionData,
-    undefined,
-    event,
-  );
-
-  onEvent(parsed, event);
-}
 
 function ignoreBuggyEvents(type) {
   const eventsToIgnore = [
@@ -139,6 +70,10 @@ const defaults = {
   eventAttributePrefix: 'evs.',
 };
 
+function findOnEvent(fn) {
+  return this === fn;
+}
+
 /** creates a namespace with a unique id appended */
 function createScope(namespace, options) {
   const optionsWithDefaults = {
@@ -185,8 +120,7 @@ function createScope(namespace, options) {
 
       return function unsubscribe() {
         const index = subscriptions
-          .findIndex(onEvent);
-
+          .findIndex(findOnEvent, onEvent);
         subscriptions.splice(index, 1);
       };
     },
