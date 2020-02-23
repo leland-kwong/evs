@@ -191,7 +191,7 @@ function render(rootNode, state) {
         ${PerfUi}
 
         ${NewTodoForm}
-        ${TodosList}
+        ${TodosList}        
       </div>
     </div>
   `);
@@ -308,7 +308,7 @@ function init() {
     render($root, state);
   };
 
-  const unsubscribe = evScope.subscribe((action) => {
+  evScope.subscribe((action) => {
     console.log(action);
     const { type } = action;
 
@@ -322,8 +322,6 @@ function init() {
 
     update(reducer(state, action));
   });
-
-  // unsubscribe();
 
   update(state);
 }

@@ -8,6 +8,7 @@ import {
   registeredFns,
 } from './action-encoder';
 import { string } from './internal/string';
+import { EvsSyntheticEvent } from './internal/synthetic-event';
 
 function ignoreBuggyEvents(type) {
   const eventsToIgnore = [
@@ -76,18 +77,20 @@ function findThis(v) {
   return this === v;
 }
 
-function rootSubscriber(action, event, subscriptions) {
+function notifySubscribers(action, event, subscriptions) {
   subscriptions
     .forEach((fn) =>
       fn(action, event));
 }
 
+let pooledSyntheticEvent = null;
+
 function dispatch(domEvent, scope, subscriptions) {
-  const { type: eventType } = domEvent;
-  const syntheticEvent = {
-    type: eventType,
-  };
   const { path } = domEvent;
+  pooledSyntheticEvent = pooledSyntheticEvent
+    || new EvsSyntheticEvent();
+  pooledSyntheticEvent
+    .setOriginalEvent(domEvent);
 
   /**
    * Simulate bubbling by walking up the
@@ -96,11 +99,11 @@ function dispatch(domEvent, scope, subscriptions) {
   let i = 0;
   while (i < path.length) {
     const node = path[i];
-    syntheticEvent.target = node;
+    pooledSyntheticEvent
+      .setCurrentTarget(node);
 
     const response = handleDispatch(
-      syntheticEvent,
-      domEvent,
+      pooledSyntheticEvent,
       scope.options,
       scope.namespace,
     );
@@ -112,9 +115,9 @@ function dispatch(domEvent, scope, subscriptions) {
         actionOpts,
       ] = response;
 
-      rootSubscriber(
+      notifySubscribers(
         parsedAction,
-        domEvent,
+        pooledSyntheticEvent,
         subscriptions,
       );
 
@@ -124,16 +127,21 @@ function dispatch(domEvent, scope, subscriptions) {
       } = actionOpts;
 
       if (preventDefault) {
-        domEvent.preventDefault();
+        pooledSyntheticEvent.preventDefault();
       }
 
       // simulate event.stopPropagation()
       if (stopPropagation) {
-        return;
+        break;
       }
     }
     // continue to next node up the path
     i += 1;
+  }
+  pooledSyntheticEvent.eventEnded();
+
+  if (pooledSyntheticEvent.persisted) {
+    pooledSyntheticEvent = null;
   }
 }
 

@@ -4,6 +4,7 @@ import {
   isBrowser,
 } from './constants';
 import { string } from './internal/string';
+import { isFunc } from './internal/is-func';
 
 let encoderLengthWarned = false;
 let domEventContext;
@@ -23,11 +24,8 @@ const nodeTypes = {
 const identity = (v) =>
   v;
 
-const isFunc = (v) =>
-  typeof v === 'function';
-
-function evsError(stringsList) {
-  return `[evs error]${string(stringsList)}`;
+function evsError(stringsList, sep) {
+  return `[evs error]${string(stringsList, sep)}`;
 }
 
 function checkDuplicateFn(fnId, fn) {
@@ -113,6 +111,12 @@ function contextReplacer(key, value) {
   return value;
 }
 
+/*
+ * TODO:
+ * Add support for inline functions. This will
+ * allow for developer convenience at the expense
+ * of performance and less security.
+ * /
 /**
  * Generates namespaced html data to be used
  * as a DOM attribute value.
@@ -125,7 +129,6 @@ export function encodeAction(
    * TODO:
    * Add support for additional options:
    *
-   * - bubbles: boolean
    * - capture: boolean
    * */
   eventOpts = {},
@@ -211,18 +214,17 @@ function getActionAttr(DOMTarget, attrName) {
 
 export function handleDispatch(
   syntheticEvent,
-  originalEvent,
   scopeOptions,
   refId,
 ) {
   const {
     eventAttributePrefix,
   } = scopeOptions;
-  const { type, target } = syntheticEvent;
+  const { type, currentTarget } = syntheticEvent;
   const normalizedType = mapEventType[type]
    || type;
   const actionAttr = getActionAttr(
-    target,
+    currentTarget,
     `${eventAttributePrefix}${normalizedType}`,
   );
 
@@ -245,6 +247,6 @@ export function handleDispatch(
 
   return decodeAction(
     domActionData,
-    originalEvent,
+    syntheticEvent,
   );
 }
