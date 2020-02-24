@@ -1,22 +1,39 @@
-/* global MutationObserver, CustomEvent */
+/* global document, MutationObserver, CustomEvent */
 import {
   domNodeTypes,
   isBrowser,
 } from '../constants';
+import { equal } from './equal';
 import { forEach } from './for-each';
+
+/**
+ * Web component lifecycle:
+ *
+ * 1. render (when added to dom)
+ * 2. render (when `evs._render` attribute value changes)
+ * 3. destroy (when removed from dom)
+ */
+
+let globalStylesInitialized = false;
 
 const pInitialized = '@initialized';
 const pRenderAttr = 'evs._render';
+export const componentClassName = 'evs-component';
 
 function isDomElement(node) {
   return node
-    && node.nodeType === domNodeTypes.element;
+    && equal(
+      node.nodeType,
+      domNodeTypes.element,
+    );
 }
 
 export function isEvsComponent(node) {
   return isDomElement(node)
-    && node.attributes[pRenderAttr]
-      !== undefined;
+    && !equal(
+      node.attributes[pRenderAttr],
+      undefined,
+    );
 }
 
 const renderEvent = isBrowser
@@ -25,14 +42,14 @@ const renderEvent = isBrowser
   })
   : '@nonBrowserCustomEvent';
 
-function renderComponent(domNode) {
+function dispatchRenderEvent(domNode) {
   domNode.dispatchEvent(renderEvent);
 }
 
 const componentUpdateObserver = isBrowser
   ? new MutationObserver((mutations) => {
     forEach(mutations, ({ target }) => {
-      renderComponent(target);
+      dispatchRenderEvent(target);
     });
   })
   : null;
@@ -47,10 +64,10 @@ function initializeIfComponent(domNode) {
 
   const n = domNode;
   n[pInitialized] = true;
-  domNode.dispatchEvent(renderEvent);
   componentUpdateObserver.observe(
     domNode, updateObserverConfig,
   );
+  dispatchRenderEvent(domNode);
 }
 
 // walks children first
@@ -71,7 +88,26 @@ function onlyElements(domNode) {
     && !domNode[pInitialized];
 }
 
-export function watchForNewDomComponents(domNode) {
+function initializeGlobalStyles() {
+  if (globalStylesInitialized) return;
+  globalStylesInitialized = true;
+
+  const style = document.createElement('style');
+
+  style.innerHTML = /* css */`
+    /* base evs styles */
+    .${componentClassName} {
+      display: block;
+    }
+  `;
+
+  document.head.insertBefore(
+    style,
+    document.head.firstElementChild.nextSibling,
+  );
+}
+
+export function watchComponentsAdded(domNode) {
   function processAddedNode(node) {
     walkDomElements(
       node,
@@ -85,7 +121,6 @@ export function watchForNewDomComponents(domNode) {
   }
 
   const onChange = (mutations) => {
-    // console.log(mutations);
     mutations.forEach(processMutation);
   };
   const observer = new MutationObserver(onChange);
@@ -93,4 +128,5 @@ export function watchForNewDomComponents(domNode) {
     childList: true,
     subtree: true,
   });
+  initializeGlobalStyles();
 }

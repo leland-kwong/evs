@@ -7,14 +7,15 @@ import {
   handleDispatch,
   registeredFns,
 } from './action-encoder';
+import { equal } from './internal/equal';
 import { string } from './internal/string';
 import { EvsSyntheticEvent } from './internal/synthetic-event';
 import {
-  watchForNewDomComponents,
+  watchComponentsAdded,
 } from './internal/web-component';
 
 if (isBrowser) {
-  watchForNewDomComponents(document.body);
+  watchComponentsAdded(document.body);
 }
 
 function ignoreBuggyEvents(type) {
@@ -37,15 +38,15 @@ function ignoreBuggyEvents(type) {
   return !filterRe.test(type);
 }
 
-const customEvents = [
-  '_render',
-];
+export const customEvents = {
+  render: '_render',
+};
 
 const domEventTypes = [
   ...getSupportedEventTypes(),
   'focusin',
   'focusout',
-  ...customEvents,
+  ...Object.values(customEvents),
 ].filter(ignoreBuggyEvents);
 
 function setupGlobalListeners(
@@ -119,7 +120,7 @@ function dispatch(domEvent, scope, subscriptions) {
       scope.options,
       scope.namespace,
     );
-    const hasResponse = response !== null;
+    const hasResponse = !equal(response, null);
 
     if (hasResponse) {
       const [

@@ -2,18 +2,42 @@
 import outdent from 'outdent';
 import morphdom from 'morphdom';
 import * as evs from '../src/index';
-import { isEvsComponent } from '../src/internal/web-component';
+import {
+  isEvsComponent,
+  componentClassName,
+} from '../src/internal/web-component';
+import { equal } from '../src/internal/equal';
+
+const NullRender = '@NullRender';
+function isNullRender(v) {
+  return equal(v, NullRender);
+}
+
+function BoolAttr(attrName, isTrue) {
+  return isTrue ? attrName : '';
+}
+
+const baseMorphdomOptions = {
+  onBeforeElUpdated(fromEl, toEl) {
+    if (isEvsComponent(fromEl)) {
+      const renderAttr = `evs.${evs.customEvents.render}`;
+      const fromRender = fromEl.getAttribute(renderAttr);
+      const toRender = toEl.getAttribute(renderAttr);
+
+      return !equal(fromRender, toRender);
+    }
+    return true;
+  },
+  onBeforeElChildrenUpdated(fromEl) {
+    return !isEvsComponent(fromEl);
+  },
+};
 
 function renderDom(domNode, htmlString) {
   const childrenOnly = isEvsComponent(domNode);
 
   morphdom(domNode, htmlString, {
-    onBeforeElChildrenUpdated(fromEl) {
-      if (isEvsComponent(fromEl)) {
-        return false;
-      }
-      return true;
-    },
+    ...baseMorphdomOptions,
     childrenOnly,
   });
 }
@@ -143,6 +167,39 @@ const TestComponent = ({
     `,
   });
 
+const NullComponent = ({
+  $root,
+}) =>
+  ({
+    type: 'ComponentRender',
+    rootNode: $root,
+    render: NullRender,
+  });
+
+const ToggleLogAction = (enabled) =>
+  ({
+    type: 'EnableLogAction',
+    enabled: !enabled,
+  });
+
+function DevUi({ logAction }) {
+  return /* html */`
+    <div>
+      <h2>Dev controls</h2>
+      <label>
+        <input
+          type="checkbox"
+          ${BoolAttr('checked', logAction)}
+          evs.change="${evScope.call(
+            ToggleLogAction, logAction,
+          )}"
+        />
+        log actions
+      </label>
+    </div>
+  `;
+}
+
 function renderApp(rootNode, state) {
   const TodoItem = ([id, { text, done }]) => {
     const editText = evScope.call(
@@ -153,41 +210,45 @@ function renderApp(rootNode, state) {
       TodoSetDone,
       { id, done: evs.InputChecked },
     );
+    const SubComponent = done
+      ? evScope.call(NullComponent, {
+        $root: evs.EventTarget,
+      })
+      : evScope.call(TestComponent, {
+        props: {
+          count: state.tickCount,
+        },
+        $root: evs.EventTarget,
+        children: /* html */`
+        <div>First Child ${state.tickCount}</div>
+
+        <div evs._render="${evScope.call(
+          TestComponent, {
+            $root: evs.EventTarget,
+            children: /* html */`
+              <div>I am recursive ${state.tickCount}</div>
+            `,
+          },
+        )}"></div>
+
+        <div>Next Child</div>
+      `,
+      });
 
     return /* html */`
       <li>
         <input
           type="checkbox"
-          ${done ? 'checked' : ''}
+          ${BoolAttr('checked', done)}
           evs.change="${toggleDone}"
         />
+
         <input
           value="${text}"
           evs.input="${editText}"
         />
 
-        <div evs._render="${evScope.call(
-          TestComponent, {
-            props: {
-              count: state.tickCount,
-            },
-            $root: evs.EventTarget,
-            children: /* html */`
-              <div>First Child ${state.tickCount}</div>
-
-              <div evs._render="${evScope.call(
-                TestComponent, {
-                  $root: evs.EventTarget,
-                  children: /* html */`
-                    <div>I am recursive</div>
-                  `,
-                },
-              )}"></div>
-
-              <div>Next Child</div>
-            `,
-          },
-        )}"></div>
+        <div evs._render="${SubComponent}"></div>
       </li>
     `;
   };
@@ -271,6 +332,7 @@ function renderApp(rootNode, state) {
         <h1>EVS</h1>
         <h2>data-driven events for the web</h2>
 
+        ${DevUi({ logAction: state.logAction })}
         ${PerfUi}
 
         ${NewTodoForm}
@@ -305,6 +367,7 @@ const initialState = {
     count: 5,
   },
   tickCount: 0,
+  logAction: true,
 };
 
 const stateReducers = {
@@ -359,6 +422,14 @@ const stateReducers = {
       tickCount: state.tickCount + 1,
     };
   },
+  EnableLogAction(state, action) {
+    const { enabled = true } = action;
+
+    return {
+      ...state,
+      logAction: enabled,
+    };
+  },
 };
 
 function wrapWithRoot(tagName, renderResult) {
@@ -375,6 +446,7 @@ function wrapWithRoot(tagName, renderResult) {
 
 const sideEffects = {
   RunActionPerf(state) {
+    const { actionPerf } = state;
     const iterRange = new Array(400).fill(0);
     const listOfStrings = new Array(50).fill(0).map(() =>
       Math.random().toString(16).slice(0, 10)).join('');
@@ -395,7 +467,6 @@ const sideEffects = {
         );
       });
     }
-    const { actionPerf } = state;
     const results = benchFn(
       actionCreationPerf,
       null,
@@ -414,6 +485,14 @@ const sideEffects = {
     } = action;
     const { tagName } = rootNode;
 
+    const shouldDismount = isNullRender(render)
+      && !rootNode.evsDismounted;
+    if (shouldDismount) {
+      rootNode.evsDismounted = true;
+      rootNode.parentNode.removeChild(rootNode);
+      return;
+    }
+
     renderDom(
       rootNode,
       wrapWithRoot(tagName, render),
@@ -424,6 +503,7 @@ const sideEffects = {
         key, attributes[key],
       );
     });
+    rootNode.classList.add(componentClassName);
   },
 };
 
@@ -440,7 +520,9 @@ function init() {
   };
 
   evScope.subscribe((action) => {
-    console.log(action);
+    if (state.logAction) {
+      console.log(action);
+    }
     const { type } = action;
 
     const effectFn = sideEffects[type] || noop;

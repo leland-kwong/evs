@@ -4,6 +4,7 @@ import {
   isBrowser,
   domNodeTypes as nodeTypes,
 } from './constants';
+import { equal } from './internal/equal';
 import { string } from './internal/string';
 import { isFunc } from './internal/is-func';
 
@@ -29,7 +30,7 @@ function checkDuplicateFn(fnId, fn) {
     ? registeredFns.get(fnId)
     : null;
   const isDuplicate = fromBefore
-    && fn !== fromBefore;
+    && !equal(fn, fromBefore);
 
   if (isDuplicate) {
     throw new Error(evsError([
