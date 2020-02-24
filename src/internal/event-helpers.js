@@ -10,6 +10,11 @@ export function InputChecked(event) {
   return event.target.checked;
 }
 
+export function EventTarget(event) {
+  return event.target;
+}
+
+
 export function Event(event) {
   return event;
 }

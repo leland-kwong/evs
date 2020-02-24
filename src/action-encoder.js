@@ -2,6 +2,7 @@ import * as htmlEscaper from 'html-escaper';
 import {
   nsDelim,
   isBrowser,
+  domNodeTypes as nodeTypes,
 } from './constants';
 import { string } from './internal/string';
 import { isFunc } from './internal/is-func';
@@ -14,11 +15,6 @@ export const registeredFns = new Map();
 const mapEventType = {
   focusin: 'focus',
   focusout: 'blur',
-};
-
-const nodeTypes = {
-  document: 9,
-  element: 1,
 };
 
 const identity = (v) =>
@@ -179,10 +175,12 @@ export function decodeAction(
   const encodedAction = rawData.slice(
     rawData.indexOf(nsDelim) + nsDelim.length,
   );
-  const [
-    rawAction,
-    rawContext,
-  ] = encodedAction.split(actionSplitter);
+  const rawAction = encodedAction.slice(
+    0, encodedAction.indexOf(actionSplitter),
+  );
+  const rawContext = encodedAction.slice(
+    encodedAction.indexOf(actionSplitter) + actionSplitter.length,
+  );
   const { context, eventOpts } = JSON.parse(
     rawContext, contextReviver,
   );

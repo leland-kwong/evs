@@ -9,6 +9,13 @@ import {
 } from './action-encoder';
 import { string } from './internal/string';
 import { EvsSyntheticEvent } from './internal/synthetic-event';
+import {
+  watchForNewDomComponents,
+} from './internal/web-component';
+
+if (isBrowser) {
+  watchForNewDomComponents(document.body);
+}
 
 function ignoreBuggyEvents(type) {
   const eventsToIgnore = [
@@ -30,10 +37,15 @@ function ignoreBuggyEvents(type) {
   return !filterRe.test(type);
 }
 
+const customEvents = [
+  '_render',
+];
+
 const domEventTypes = [
   ...getSupportedEventTypes(),
   'focusin',
   'focusout',
+  ...customEvents,
 ].filter(ignoreBuggyEvents);
 
 function setupGlobalListeners(
@@ -135,6 +147,13 @@ function dispatch(domEvent, scope, subscriptions) {
         break;
       }
     }
+
+    const noBubble = !pooledSyntheticEvent.bubbles
+      || pooledSyntheticEvent.type === '_render';
+    if (noBubble) {
+      break;
+    }
+
     // continue to next node up the path
     i += 1;
   }

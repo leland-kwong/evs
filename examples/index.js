@@ -1,7 +1,22 @@
-/* global document, performance */
+/* global document, performance, window */
 import outdent from 'outdent';
 import morphdom from 'morphdom';
 import * as evs from '../src/index';
+import { isEvsComponent } from '../src/internal/web-component';
+
+function renderDom(domNode, htmlString) {
+  const childrenOnly = isEvsComponent(domNode);
+
+  morphdom(domNode, htmlString, {
+    onBeforeElChildrenUpdated(fromEl) {
+      if (isEvsComponent(fromEl)) {
+        return false;
+      }
+      return true;
+    },
+    childrenOnly,
+  });
+}
 
 const evScope = evs.createScope('EvsTest');
 
@@ -89,7 +104,46 @@ const TestBubbling = () =>
     type: 'TestBubbling',
   });
 
-function render(rootNode, state) {
+const CheckboxComponent = ({
+  $root,
+}) =>
+  ({
+    type: 'ComponentRender',
+    rootNode: $root,
+    render: /* html */`
+      <div>
+        <strong>custom checkbox</strong>
+      </div>
+      <input type="checkbox" checked />
+    `,
+  });
+
+const TestComponent = ({
+  children,
+  $root,
+}) =>
+  ({
+    type: 'ComponentRender',
+    rootNode: $root,
+    attributes: {
+      style: `
+        border: 1px solid #000;
+        padding: 1rem;
+      `,
+    },
+    render: /* html */`\
+      <h2>My Custom Component</h2>
+      ${children}
+
+      <evs-checkbox evs._render="${evScope.call(
+        CheckboxComponent, {
+          $root: evs.EventTarget,
+        },
+      )}"></evs-checkbox>
+    `,
+  });
+
+function renderApp(rootNode, state) {
   const TodoItem = ([id, { text, done }]) => {
     const editText = evScope.call(
       TodoSetText,
@@ -107,17 +161,39 @@ function render(rootNode, state) {
           ${done ? 'checked' : ''}
           evs.change="${toggleDone}"
         />
-        <input 
-          data-foobar="'>'"
+        <input
           value="${text}"
           evs.input="${editText}"
         />
+
+        <div evs._render="${evScope.call(
+          TestComponent, {
+            props: {
+              count: state.tickCount,
+            },
+            $root: evs.EventTarget,
+            children: /* html */`
+              <div>First Child ${state.tickCount}</div>
+
+              <div evs._render="${evScope.call(
+                TestComponent, {
+                  $root: evs.EventTarget,
+                  children: /* html */`
+                    <div>I am recursive</div>
+                  `,
+                },
+              )}"></div>
+
+              <div>Next Child</div>
+            `,
+          },
+        )}"></div>
       </li>
     `;
   };
 
   const PerfUi = /* html */`
-    <form 
+    <form
       evs.submit="${evScope.call(
         RunActionPerf,
         null,
@@ -130,7 +206,7 @@ function render(rootNode, state) {
     >
       <div>
         test count:
-        <input 
+        <input
           evs.input="${evScope.call(
             SetActionPerfCount,
             evs.InputNumberValue,
@@ -141,7 +217,7 @@ function render(rootNode, state) {
           value="${state.actionPerf.count}"
         />
       </div>
-      <button 
+      <button
         type="submit"
         evs.click="${evScope.call(
           noop,
@@ -154,13 +230,13 @@ function render(rootNode, state) {
   `;
 
   const NewTodoForm = /* html */`
-    <form 
+    <form
       evs.submit="${evScope.call(
         AddTodo,
         null,
         { preventDefault: true },
       )}"
-    >      
+    >
       <input
         evs.input="${evScope.call(
           SetNewTodoText,
@@ -176,7 +252,7 @@ function render(rootNode, state) {
     .map(TodoItem)
     .join('');
 
-  morphdom(rootNode, outdent/* html */`
+  renderDom(rootNode, outdent/* html */`
     <div>
       <style>
         html,
@@ -184,7 +260,7 @@ function render(rootNode, state) {
           margin: 0;
           min-height: 100vh;
         }
-        
+
         .app {
           padding: 1em;
           font-family: sans-serif;
@@ -193,12 +269,12 @@ function render(rootNode, state) {
 
       <div class="app">
         <h1>EVS</h1>
-        <h2>data-driven events for the web</h2>         
+        <h2>data-driven events for the web</h2>
 
         ${PerfUi}
 
         ${NewTodoForm}
-        ${TodosList}        
+        ${TodosList}
       </div>
     </div>
   `);
@@ -207,20 +283,28 @@ function render(rootNode, state) {
 const makeTodoId = () =>
   Math.random().toString(32).slice(2);
 
-function setupNewTodo() {
-  return {
-    text: '',
-    done: false,
-    id: makeTodoId(),
-  };
+function setupNewTodo(props = {}) {
+  const {
+    id = makeTodoId(),
+    text = '',
+    done = false,
+  } = props;
+
+  return { text, done, id };
 }
 
 const initialState = {
-  todos: {},
+  todos: {
+    item1: setupNewTodo({
+      id: 'item1',
+      text: 'initial item',
+    }),
+  },
   newTodo: setupNewTodo(),
   actionPerf: {
     count: 5,
   },
+  tickCount: 0,
 };
 
 const stateReducers = {
@@ -269,14 +353,32 @@ const stateReducers = {
       },
     };
   },
+  Tick(state) {
+    return {
+      ...state,
+      tickCount: state.tickCount + 1,
+    };
+  },
 };
+
+function wrapWithRoot(tagName, renderResult) {
+  /**
+   * Morphdom includes the root node
+   * when diffing, so we need to
+   * include it.
+   */
+
+  return /* html */`
+<${tagName}>${renderResult}</${tagName}>
+  `.trim();
+}
 
 const sideEffects = {
   RunActionPerf(state) {
-    const iterRange = new Array(100).fill(0);
-    const listOfStrings = new Array(200).fill(0).map(() =>
-      Math.random().toString(16).slice(0, 10));
-    // console.log(listOfStrings.join().length);
+    const iterRange = new Array(400).fill(0);
+    const listOfStrings = new Array(50).fill(0).map(() =>
+      Math.random().toString(16).slice(0, 10)).join('');
+    // console.log(listOfStrings.length);
     const actionHandler = (text) =>
       ({
         type: 'setNewTodoText',
@@ -301,6 +403,28 @@ const sideEffects = {
     );
     console.log(results);
   },
+
+  ComponentRender(state, action) {
+    const {
+      rootNode,
+      /* attributes to reflect to host */
+      attributes = {},
+      /* html string */
+      render = '',
+    } = action;
+    const { tagName } = rootNode;
+
+    renderDom(
+      rootNode,
+      wrapWithRoot(tagName, render),
+    );
+
+    Object.keys(attributes).forEach((key) => {
+      rootNode.setAttribute(
+        key, attributes[key],
+      );
+    });
+  },
 };
 
 function init() {
@@ -312,7 +436,7 @@ function init() {
 
   const update = (nextState) => {
     state = nextState;
-    render($root, state);
+    renderApp($root, state);
   };
 
   evScope.subscribe((action) => {
@@ -329,6 +453,10 @@ function init() {
 
     update(reducer(state, action));
   });
+
+  window.tick = () => {
+    update(stateReducers.Tick(state));
+  };
 
   update(state);
 }
