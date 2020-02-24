@@ -1,12 +1,121 @@
 /* global document, performance, window */
 import outdent from 'outdent';
 import morphdom from 'morphdom';
+import * as atomicState from 'atomic-state/lib';
 import * as evs from '../src/index';
 import {
   isEvsComponent,
   componentClassName,
+  watchComponentsAdded,
 } from '../src/internal/web-component';
+import { isBrowser } from '../src/constants';
 import { equal } from '../src/internal/equal';
+
+if (isBrowser) {
+  watchComponentsAdded(document.body);
+}
+
+const makeTodoId = () =>
+  Math.random().toString(32).slice(2);
+
+function setupNewTodo(props = {}) {
+  const {
+    id = makeTodoId(),
+    text = '',
+    done = false,
+  } = props;
+
+  return { text, done, id };
+}
+
+const globalState = atomicState.atom({
+  todos: Array(100).fill(0).reduce((result, _, index) => {
+    const r = result;
+    r[`item${index}`] = setupNewTodo({
+      id: `item${index}`,
+      text: 'initial item',
+    });
+
+    return r;
+  }, {}),
+  newTodo: setupNewTodo(),
+  actionPerf: {
+    count: 5,
+  },
+  tickCount: 0,
+  logAction: false,
+});
+
+const stateReducers = {
+  Init(state) {
+    return state;
+  },
+  AddTodo(state) {
+    return {
+      ...state,
+      newTodo: setupNewTodo(),
+      todos: {
+        ...state.todos,
+        [state.newTodo.id]:
+          state.newTodo,
+      },
+    };
+  },
+  SetNewTodoText(state, action) {
+    const { text } = action;
+
+    return {
+      ...state,
+      newTodo: {
+        ...state.newTodo,
+        text,
+      },
+    };
+  },
+  EditTodo(state, action) {
+    const { id, changes } = action;
+    const todo = state.todos[id];
+
+    return {
+      ...state,
+      todos: {
+        ...state.todos,
+        [id]: { ...todo, ...changes },
+      },
+    };
+  },
+  SetActionPerfCount(state, action) {
+    const { count } = action;
+
+    return {
+      ...state,
+      actionPerf: {
+        ...state.actionPerf,
+        count,
+      },
+    };
+  },
+  Tick(state) {
+    return {
+      ...state,
+      tickCount: state.tickCount + 1,
+    };
+  },
+  EnableLogAction(state, action) {
+    const { enabled = true } = action;
+
+    return {
+      ...state,
+      logAction: enabled,
+    };
+  },
+};
+
+const evScope = evs.createScope('EvsTest', {
+  dataSource() {
+    return globalState;
+  },
+});
 
 const NullRender = '@NullRender';
 function isNullRender(v) {
@@ -26,6 +135,11 @@ const baseMorphdomOptions = {
 
       return !equal(fromRender, toRender);
     }
+
+    if (fromEl.isEqualNode(toEl)) {
+      return false;
+    }
+
     return true;
   },
   onBeforeElChildrenUpdated(fromEl) {
@@ -41,8 +155,6 @@ function renderDom(domNode, htmlString) {
     childrenOnly,
   });
 }
-
-const evScope = evs.createScope('EvsTest');
 
 const noop = () =>
   ({ type: '@noop' });
@@ -80,7 +192,11 @@ function benchFn(
       runSoFar + 1, results,
     );
   }
-  return results;
+  return {
+    results,
+    average: results.reduce((a, b) =>
+      a + b) / results.length,
+  };
 }
 
 const SetNewTodoText = (text) =>
@@ -130,23 +246,48 @@ const TestBubbling = () =>
 
 const CheckboxComponent = ({
   $root,
+  props: {
+    checked,
+  } = { checked: false },
 }) =>
   ({
     type: 'ComponentRender',
     rootNode: $root,
     render: /* html */`
-      <div>
-        <strong>custom checkbox</strong>
-      </div>
-      <input type="checkbox" checked />
+      <label>
+        <input
+          type="checkbox"
+          ${BoolAttr('checked', checked)}
+        />
+        <strong>
+          custom checkbox
+        </strong>
+      </label>
     `,
   });
 
-const TestComponent = ({
-  children,
-  $root,
-}) =>
-  ({
+const TestComponent = (props, ns) => {
+  const {
+    children = '',
+    $root,
+  } = props;
+  const stateRef = evs.getDataSource(ns);
+  const state = atomicState.read(stateRef);
+
+  /**
+   * Since we can watch with a key, its just overwrites
+   * the previous watcher after each render. This allows
+   * us to watch the state and rerender automatically
+   * when it changes.
+   */
+  atomicState.addWatch(stateRef, $root, () => {
+    evs.notifySubscribers(
+      evScope,
+      TestComponent(props, ns),
+    );
+  });
+
+  return {
     type: 'ComponentRender',
     rootNode: $root,
     attributes: {
@@ -155,17 +296,21 @@ const TestComponent = ({
         padding: 1rem;
       `,
     },
-    render: /* html */`\
+    render: /* html */`
       <h2>My Custom Component</h2>
       ${children}
 
-      <evs-checkbox evs._render="${evScope.call(
+      <evs-checkbox evs._render="${evs.getScope(ns).call(
         CheckboxComponent, {
           $root: evs.EventTarget,
+          props: {
+            checked: state.tickCount % 2 === 0,
+          },
         },
       )}"></evs-checkbox>
     `,
-  });
+  };
+};
 
 const NullComponent = ({
   $root,
@@ -200,7 +345,7 @@ function DevUi({ logAction }) {
   `;
 }
 
-function renderApp(rootNode, state) {
+function renderApp(state) {
   const TodoItem = ([id, { text, done }]) => {
     const editText = evScope.call(
       TodoSetText,
@@ -215,19 +360,19 @@ function renderApp(rootNode, state) {
         $root: evs.EventTarget,
       })
       : evScope.call(TestComponent, {
-        props: {
-          count: state.tickCount,
-        },
+        // props: {
+        //   count: state.tickCount,
+        // },
         $root: evs.EventTarget,
         children: /* html */`
-        <div>First Child ${state.tickCount}</div>
+        <div>First Child</div>
 
         <div evs._render="${evScope.call(
           TestComponent, {
             $root: evs.EventTarget,
-            children: /* html */`
-              <div>I am recursive ${state.tickCount}</div>
-            `,
+            // children: /* html */`
+            //   <div>I am recursive ${state.tickCount}</div>
+            // `,
           },
         )}"></div>
 
@@ -313,7 +458,7 @@ function renderApp(rootNode, state) {
     .map(TodoItem)
     .join('');
 
-  renderDom(rootNode, outdent/* html */`
+  return outdent/* html */`
     <div>
       <style>
         html,
@@ -339,98 +484,8 @@ function renderApp(rootNode, state) {
         ${TodosList}
       </div>
     </div>
-  `);
+  `;
 }
-
-const makeTodoId = () =>
-  Math.random().toString(32).slice(2);
-
-function setupNewTodo(props = {}) {
-  const {
-    id = makeTodoId(),
-    text = '',
-    done = false,
-  } = props;
-
-  return { text, done, id };
-}
-
-const initialState = {
-  todos: {
-    item1: setupNewTodo({
-      id: 'item1',
-      text: 'initial item',
-    }),
-  },
-  newTodo: setupNewTodo(),
-  actionPerf: {
-    count: 5,
-  },
-  tickCount: 0,
-  logAction: true,
-};
-
-const stateReducers = {
-  AddTodo(state) {
-    return {
-      ...state,
-      newTodo: setupNewTodo(),
-      todos: {
-        ...state.todos,
-        [state.newTodo.id]:
-          state.newTodo,
-      },
-    };
-  },
-  SetNewTodoText(state, action) {
-    const { text } = action;
-
-    return {
-      ...state,
-      newTodo: {
-        ...state.newTodo,
-        text,
-      },
-    };
-  },
-  EditTodo(state, action) {
-    const { id, changes } = action;
-    const todo = state.todos[id];
-
-    return {
-      ...state,
-      todos: {
-        ...state.todos,
-        [id]: { ...todo, ...changes },
-      },
-    };
-  },
-  SetActionPerfCount(state, action) {
-    const { count } = action;
-
-    return {
-      ...state,
-      actionPerf: {
-        ...state.actionPerf,
-        count,
-      },
-    };
-  },
-  Tick(state) {
-    return {
-      ...state,
-      tickCount: state.tickCount + 1,
-    };
-  },
-  EnableLogAction(state, action) {
-    const { enabled = true } = action;
-
-    return {
-      ...state,
-      logAction: enabled,
-    };
-  },
-};
 
 function wrapWithRoot(tagName, renderResult) {
   /**
@@ -441,7 +496,7 @@ function wrapWithRoot(tagName, renderResult) {
 
   return /* html */`
 <${tagName}>${renderResult}</${tagName}>
-  `.trim();
+  `;
 }
 
 const sideEffects = {
@@ -484,14 +539,20 @@ const sideEffects = {
       render = '',
     } = action;
     const { tagName } = rootNode;
-
     const shouldDismount = isNullRender(render)
       && !rootNode.evsDismounted;
+
     if (shouldDismount) {
       rootNode.evsDismounted = true;
       rootNode.parentNode.removeChild(rootNode);
       return;
     }
+
+    const isNoChange = equal(rootNode.evsPreviousRender, render);
+
+    if (isNoChange) return;
+
+    rootNode.evsPreviousRender = render;
 
     renderDom(
       rootNode,
@@ -508,20 +569,33 @@ const sideEffects = {
 };
 
 function init() {
-  let state = initialState;
-
   console.log(evScope);
 
   const { $root } = setupDOM();
 
-  const update = (nextState) => {
-    state = nextState;
-    renderApp($root, state);
+  const update = (ref, key, oldState, newState) => {
+    // const markerA = 'render marker';
+    // performance.mark(markerA);
+
+    renderDom(
+      $root,
+      renderApp(newState),
+    );
+
+    // performance.measure('render time', markerA);
+    // console.log(performance.getEntriesByType('measure')[0]);
+    // performance.clearMarks();
+    // performance.clearMeasures();
   };
+  atomicState.addWatch(globalState, 'updateAndRender', update);
 
   evScope.subscribe((action) => {
+    const state = atomicState.read(globalState);
     if (state.logAction) {
-      console.log(action);
+      console.group('evs data');
+      console.log('[action]', action);
+      console.log('[info]', evs.info());
+      console.groupEnd();
     }
     const { type } = action;
 
@@ -533,14 +607,17 @@ function init() {
       return;
     }
 
-    update(reducer(state, action));
+    atomicState.swap(globalState, reducer, action);
   });
 
   window.tick = () => {
-    update(stateReducers.Tick(state));
+    atomicState.swap(globalState, stateReducers.Tick);
   };
 
-  update(state);
+  evs.notifySubscribers(
+    evScope,
+    { type: 'Init' },
+  );
 }
 
 init();

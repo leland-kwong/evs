@@ -13,6 +13,12 @@ let domEventContext;
 
 export const registeredFns = new Map();
 
+const propHasEvsEvent = 'hasEvsEvent';
+
+export function hasEvsEvent(domNode) {
+  return domNode[propHasEvsEvent];
+}
+
 const mapEventType = {
   focusin: 'focus',
   focusout: 'blur',
@@ -187,7 +193,11 @@ export function decodeAction(
   );
   const actionFn = getRegisteredAction(rawAction);
 
-  return [actionFn(context), eventOpts];
+  return [
+    actionFn,
+    context,
+    eventOpts,
+  ];
 }
 
 function parseActionNamespace(rawData) {
@@ -213,12 +223,9 @@ function getActionAttr(DOMTarget, attrName) {
 
 export function handleDispatch(
   syntheticEvent,
-  scopeOptions,
-  refId,
+  eventAttributePrefix,
+  initiatorNamespace,
 ) {
-  const {
-    eventAttributePrefix,
-  } = scopeOptions;
   const { type, currentTarget } = syntheticEvent;
   const normalizedType = mapEventType[type]
    || type;
@@ -231,14 +238,19 @@ export function handleDispatch(
     return null;
   }
 
+  const t = syntheticEvent.currentTarget;
+  t[propHasEvsEvent] = true;
+
   const domActionData = actionAttr
     // trim any extraneous white-space
     ? actionAttr.value.trim()
     : null;
-  const namespace = parseActionNamespace(
+  const currentNamespace = parseActionNamespace(
     domActionData,
   );
-  const isNamespaceMatch = namespace === refId;
+  const isNamespaceMatch = equal(
+    currentNamespace, initiatorNamespace,
+  );
 
   if (!isNamespaceMatch) {
     return null;
@@ -247,5 +259,6 @@ export function handleDispatch(
   return decodeAction(
     domActionData,
     syntheticEvent,
+    currentNamespace,
   );
 }

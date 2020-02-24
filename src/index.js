@@ -10,12 +10,17 @@ import {
 import { equal } from './internal/equal';
 import { string } from './internal/string';
 import { EvsSyntheticEvent } from './internal/synthetic-event';
-import {
-  watchComponentsAdded,
-} from './internal/web-component';
 
-if (isBrowser) {
-  watchComponentsAdded(document.body);
+const registeredScopes = new Map();
+
+export function getScope(namespace) {
+  return registeredScopes.get(namespace);
+}
+
+export function getDataSource(namespace) {
+  return getScope(namespace)
+    .options
+    .dataSource();
 }
 
 function ignoreBuggyEvents(type) {
@@ -90,16 +95,19 @@ function findThis(v) {
   return this === v;
 }
 
-function notifySubscribers(action, event, subscriptions) {
-  subscriptions
+function notifySubscribers(scope, action) {
+  scope.$subscriptions
     .forEach((fn) =>
-      fn(action, event));
+      fn(action));
 }
 
 let pooledSyntheticEvent = null;
 
-function dispatch(domEvent, scope, subscriptions) {
+function dispatchDomEvent(domEvent, scope) {
   const { path } = domEvent;
+  const {
+    namespace: initiatorNamespace,
+  } = scope;
   pooledSyntheticEvent = pooledSyntheticEvent
     || new EvsSyntheticEvent();
   pooledSyntheticEvent
@@ -117,21 +125,25 @@ function dispatch(domEvent, scope, subscriptions) {
 
     const response = handleDispatch(
       pooledSyntheticEvent,
-      scope.options,
-      scope.namespace,
+      scope.options.eventAttributePrefix,
+      initiatorNamespace,
     );
     const hasResponse = !equal(response, null);
 
     if (hasResponse) {
       const [
-        parsedAction,
+        actionFn,
+        context,
         actionOpts,
       ] = response;
+      const actionResponse = actionFn(
+        context,
+        initiatorNamespace,
+      );
 
       notifySubscribers(
-        parsedAction,
-        pooledSyntheticEvent,
-        subscriptions,
+        scope,
+        actionResponse,
       );
 
       const {
@@ -173,6 +185,9 @@ const defaults = {
    * the server and client.
    */
   useAbsoluteNamespace: false,
+  dataSource() {
+    return 'no data source specified';
+  },
 };
 
 function createScope(namespace, options) {
@@ -188,21 +203,16 @@ function createScope(namespace, options) {
     // prevent namespace collisions
     : `${namespace}-${uid()}`;
   const subscriptions = [];
-  const scope = {
+  const scopeInfo = {
     namespace: uniqueNs,
     options: optionsWithDefaults,
-    _subscriptions: subscriptions,
+    $subscriptions: subscriptions,
   };
 
-  setupGlobalListeners((domEvent) => {
-    dispatch(domEvent, scope, subscriptions);
-  }, domEventTypes);
-  validateNamespace(namespace);
-
-  return {
-    ...scope,
+  const scopeRef = {
+    ...scopeInfo,
     call: (actionFn, arg, opts) =>
-      encodeAction(scope, actionFn, arg, opts),
+      encodeAction(scopeRef, actionFn, arg, opts),
     subscribe: (onEvent) => {
       subscriptions.push(onEvent);
 
@@ -213,23 +223,33 @@ function createScope(namespace, options) {
       };
     },
     destroy: () => {
+      registeredScopes.delete(uniqueNs);
       setupGlobalListeners(
-        dispatch,
+        dispatchDomEvent,
         domEventTypes,
         'removeEventListener',
       );
     },
   };
+  registeredScopes.set(uniqueNs, scopeRef);
+  setupGlobalListeners((domEvent) => {
+    dispatchDomEvent(domEvent, scopeRef);
+  }, domEventTypes);
+  validateNamespace(namespace);
+
+  return scopeRef;
 }
 
 function info() {
   return {
     registeredFns,
+    registeredScopes,
   };
 }
 
 export {
   createScope,
+  notifySubscribers,
   info,
 };
 
