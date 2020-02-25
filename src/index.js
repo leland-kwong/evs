@@ -91,13 +91,17 @@ function validateNamespace(namespace) {
   }
 }
 
-function callWithAction(fn) {
-  fn(this);
+function callWithAction([fn, arg]) {
+  fn(this, arg);
 }
 
-function notifySubscribers(scope, action) {
+function notify(scope, action) {
   scope.$subscriptions
     .forEach(callWithAction, action);
+}
+
+function subscribe(scope, onEvent, arg) {
+  return scope.subscribe(onEvent, arg);
 }
 
 let pooledSyntheticEvent = null;
@@ -140,7 +144,7 @@ function dispatchDomEvent(domEvent, scope) {
         initiatorNamespace,
       );
 
-      notifySubscribers(
+      notify(
         scope,
         actionResponse,
       );
@@ -216,8 +220,8 @@ function createScope(namespace, options) {
     ...scopeInfo,
     call: (actionFn, arg, opts) =>
       encodeAction(scopeRef, actionFn, arg, opts),
-    subscribe: (onEvent) => {
-      subscriptions.push(onEvent);
+    subscribe: (onEvent, arg) => {
+      subscriptions.push([onEvent, arg]);
 
       return function unsubscribe() {
         const index = subscriptions
@@ -254,7 +258,8 @@ function info() {
 
 export {
   createScope,
-  notifySubscribers,
+  notify,
+  subscribe,
   info,
   defaultScope,
 };

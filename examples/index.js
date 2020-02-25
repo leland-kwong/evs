@@ -258,33 +258,6 @@ const TodoSetDone = ({ id, done }) =>
     id,
   });
 
-const TestBubbling = () =>
-  ({
-    type: 'TestBubbling',
-  });
-
-const CheckboxComponent = ({
-  $root,
-  props: {
-    checked,
-  } = { checked: false },
-}) =>
-  ({
-    type: 'ComponentRender',
-    rootNode: $root,
-    render: html`
-      <label>
-        <input
-          type="checkbox"
-          ${BoolAttr('checked', checked)}
-        />
-        <strong>
-          custom checkbox
-        </strong>
-      </label>
-    `,
-  });
-
 const TestComponent = (props, ns) => {
   const {
     children = '',
@@ -300,7 +273,7 @@ const TestComponent = (props, ns) => {
    * when it changes.
    */
   atomicState.addWatch(stateRef, $root, () => {
-    evs.notifySubscribers(
+    evs.notify(
       evScope,
       TestComponent(props, ns),
     );
@@ -318,15 +291,6 @@ const TestComponent = (props, ns) => {
     render: html`
       <h2>My Custom Component</h2>
       ${children}
-
-      <evs-checkbox evs._render="${evs.getScope(ns).call(
-        CheckboxComponent, {
-          $root: evs.EventTarget,
-          props: {
-            checked: state.tickCount % 2 === 0,
-          },
-        },
-      )}"></evs-checkbox>
     `,
   };
 };
@@ -386,14 +350,10 @@ function renderApp(state) {
           <div evs._render="${evScope.call(
             TestComponent, {
               $root: evs.EventTarget,
-              // children: html`
-              //   <div>I am recursive ${state.tickCount}</div>
-              // `,
             },
           )}"></div>
 
-          <div>Next Child</div>
-        `,
+          <div>Next Child</div>`,
       });
 
     return html`
@@ -420,10 +380,6 @@ function renderApp(state) {
         RunActionPerf,
         null,
         { preventDefault: true },
-      )}"
-      evs.click="${evScope.call(
-        TestBubbling,
-        evs.InputValue,
       )}"
     >
       <div>
@@ -621,12 +577,12 @@ function init() {
     performance.clearMeasures();
   });
 
-  evs.notifySubscribers(
+  evs.notify(
     evScope,
     { type: 'Init' },
   );
 
-  evs.notifySubscribers(
+  evs.notify(
     evScope,
     {
       type: 'SetupMockTodos',
@@ -638,50 +594,61 @@ function init() {
 // init();
 
 (() => {
-  const root = makeUniqueElement('TodosApp');
-  const {
-    atom, swap, read, addWatch,
-  } = atomicState;
-  document.body.appendChild(root);
+  const rootDom = document.createElement('div');
+  document.body.appendChild(rootDom);
 
-  const dataSource = atom({
-    name: 'Leland',
-  });
+  const {
+    atom, swap,
+  } = atomicState;
+
   const scope = evs.createScope('@vdomTest');
-  scope.subscribe((action) => {
+
+  const onEvent = (action, context) => {
+    const { render, dataSource, rootReducer } = context;
     console.log(`[${scope.namespace}]`, action);
+    const nextState = swap(
+      dataSource, rootReducer, action,
+    );
+    render(nextState);
+  };
+
+  const render = (data) => {
+    const toDom = toDOM(
+      createElement(
+        Hello, {
+          name: data.name,
+          scope,
+        },
+      ),
+    );
+    morphdom(rootDom, toDom);
+  };
+
+  const rootReducer = (state, action) => {
     const { type } = action;
 
     switch (type) {
     case 'SetName': {
       const { name } = action;
-      return swap(dataSource, (state) =>
-        ({ ...state, name }));
+      return { ...state, name };
     }
+
     case '@VdomTestInit':
-      return swap(dataSource, (state) =>
-        state);
+      return state;
 
     default:
-      return read(dataSource);
+      return state;
     }
+  };
+
+  const dataSource = atom({
+    name: 'Leland',
   });
-  function render(ref, key, oldState, newState) {
-    const dom = toDOM(
-      createElement(
-        Hello, {
-          name: newState.name,
-          scope,
-        },
-      ),
-    );
-    morphdom(
-      root,
-      dom,
-    );
-  }
-  addWatch(dataSource, '@vdomRender', render);
-  evs.notifySubscribers(scope, {
+
+  evs.subscribe(scope, onEvent,
+    { render, rootReducer, dataSource });
+
+  evs.notify(scope, {
     type: '@VdomTestInit',
   });
 })();
