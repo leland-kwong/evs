@@ -91,14 +91,13 @@ function validateNamespace(namespace) {
   }
 }
 
-function findThis(v) {
-  return this === v;
+function callWithAction(fn) {
+  fn(this);
 }
 
 function notifySubscribers(scope, action) {
   scope.$subscriptions
-    .forEach((fn) =>
-      fn(action));
+    .forEach(callWithAction, action);
 }
 
 let pooledSyntheticEvent = null;
@@ -189,6 +188,10 @@ const defaults = {
     return 'no data source specified';
   },
 };
+
+function findThis(v) {
+  return this === v;
+}
 
 function createScope(namespace, options) {
   const optionsWithDefaults = {

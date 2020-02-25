@@ -1,5 +1,4 @@
-/* global document, performance, window */
-import outdent from 'outdent';
+/* global document, performance */
 import morphdom from 'morphdom';
 import * as atomicState from 'atomic-state/lib';
 import * as evs from '../src/index';
@@ -15,6 +14,17 @@ if (isBrowser) {
   watchComponentsAdded(document.body);
 }
 
+const html = (strings, ...exprs) => {
+  let out = '';
+  let i = 0;
+  while (i < strings.length) {
+    const e = exprs[i];
+    out += strings[i] + (e !== undefined ? e : '');
+    i += 1;
+  }
+  return out;
+};
+
 const makeTodoId = () =>
   Math.random().toString(32).slice(2);
 
@@ -29,15 +39,7 @@ function setupNewTodo(props = {}) {
 }
 
 const globalState = atomicState.atom({
-  todos: Array(100).fill(0).reduce((result, _, index) => {
-    const r = result;
-    r[`item${index}`] = setupNewTodo({
-      id: `item${index}`,
-      text: 'initial item',
-    });
-
-    return r;
-  }, {}),
+  todos: {},
   newTodo: setupNewTodo(),
   actionPerf: {
     count: 5,
@@ -99,6 +101,20 @@ const stateReducers = {
     return {
       ...state,
       tickCount: state.tickCount + 1,
+    };
+  },
+  SetupMockTodos(state, { count = 1 }) {
+    return {
+      ...state,
+      todos: Array(count).fill(0).reduce((result, _, index) => {
+        const r = result;
+        r[`item${index}`] = setupNewTodo({
+          id: `item${index}`,
+          text: 'initial item',
+        });
+
+        return r;
+      }, {}),
     };
   },
   EnableLogAction(state, action) {
@@ -253,7 +269,7 @@ const CheckboxComponent = ({
   ({
     type: 'ComponentRender',
     rootNode: $root,
-    render: /* html */`
+    render: html`
       <label>
         <input
           type="checkbox"
@@ -296,7 +312,7 @@ const TestComponent = (props, ns) => {
         padding: 1rem;
       `,
     },
-    render: /* html */`
+    render: html`
       <h2>My Custom Component</h2>
       ${children}
 
@@ -328,7 +344,7 @@ const ToggleLogAction = (enabled) =>
   });
 
 function DevUi({ logAction }) {
-  return /* html */`
+  return html`
     <div>
       <h2>Dev controls</h2>
       <label>
@@ -360,27 +376,24 @@ function renderApp(state) {
         $root: evs.EventTarget,
       })
       : evScope.call(TestComponent, {
-        // props: {
-        //   count: state.tickCount,
-        // },
         $root: evs.EventTarget,
-        children: /* html */`
-        <div>First Child</div>
+        children: html`
+          <div>First Child</div>
 
-        <div evs._render="${evScope.call(
-          TestComponent, {
-            $root: evs.EventTarget,
-            // children: /* html */`
-            //   <div>I am recursive ${state.tickCount}</div>
-            // `,
-          },
-        )}"></div>
+          <div evs._render="${evScope.call(
+            TestComponent, {
+              $root: evs.EventTarget,
+              // children: html`
+              //   <div>I am recursive ${state.tickCount}</div>
+              // `,
+            },
+          )}"></div>
 
-        <div>Next Child</div>
-      `,
+          <div>Next Child</div>
+        `,
       });
 
-    return /* html */`
+    return html`
       <li>
         <input
           type="checkbox"
@@ -398,7 +411,7 @@ function renderApp(state) {
     `;
   };
 
-  const PerfUi = /* html */`
+  const PerfUi = html`
     <form
       evs.submit="${evScope.call(
         RunActionPerf,
@@ -407,11 +420,11 @@ function renderApp(state) {
       )}"
       evs.click="${evScope.call(
         TestBubbling,
-        evs.InputValue,
+        evs.InputValuke,
       )}"
     >
       <div>
-        test count:
+        benchmark count:
         <input
           evs.input="${evScope.call(
             SetActionPerfCount,
@@ -435,7 +448,7 @@ function renderApp(state) {
     </form>
   `;
 
-  const NewTodoForm = /* html */`
+  const NewTodoForm = html`
     <form
       evs.submit="${evScope.call(
         AddTodo,
@@ -458,7 +471,7 @@ function renderApp(state) {
     .map(TodoItem)
     .join('');
 
-  return outdent/* html */`
+  return html`
     <div>
       <style>
         html,
@@ -494,7 +507,7 @@ function wrapWithRoot(tagName, renderResult) {
    * include it.
    */
 
-  return /* html */`
+  return html`
 <${tagName}>${renderResult}</${tagName}>
   `;
 }
@@ -569,25 +582,7 @@ const sideEffects = {
 };
 
 function init() {
-  console.log(evScope);
-
   const { $root } = setupDOM();
-
-  const update = (ref, key, oldState, newState) => {
-    // const markerA = 'render marker';
-    // performance.mark(markerA);
-
-    renderDom(
-      $root,
-      renderApp(newState),
-    );
-
-    // performance.measure('render time', markerA);
-    // console.log(performance.getEntriesByType('measure')[0]);
-    // performance.clearMarks();
-    // performance.clearMeasures();
-  };
-  atomicState.addWatch(globalState, 'updateAndRender', update);
 
   evScope.subscribe((action) => {
     const state = atomicState.read(globalState);
@@ -607,16 +602,33 @@ function init() {
       return;
     }
 
-    atomicState.swap(globalState, reducer, action);
-  });
+    const markerA = 'render marker';
+    performance.mark(markerA);
 
-  window.tick = () => {
-    atomicState.swap(globalState, stateReducers.Tick);
-  };
+    const nextState = atomicState
+      .swap(globalState, reducer, action);
+    renderDom(
+      $root,
+      renderApp(nextState),
+    );
+
+    performance.measure('render time', markerA);
+    console.log(performance.getEntriesByType('measure')[0]);
+    performance.clearMarks();
+    performance.clearMeasures();
+  });
 
   evs.notifySubscribers(
     evScope,
     { type: 'Init' },
+  );
+
+  evs.notifySubscribers(
+    evScope,
+    {
+      type: 'SetupMockTodos',
+      count: 100,
+    },
   );
 }
 
