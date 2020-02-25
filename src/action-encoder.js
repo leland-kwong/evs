@@ -135,9 +135,7 @@ export function encodeAction(
    * - capture: boolean
    * */
   eventOpts = {},
-  encoder = isBrowser
-    ? htmlEscaper.escape
-    : identity,
+  encoder = identity,
 ) {
   const {
     namespace,

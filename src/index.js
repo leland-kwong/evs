@@ -243,6 +243,8 @@ function createScope(namespace, options) {
   return scopeRef;
 }
 
+const defaultScope = createScope('@doNotUse');
+
 function info() {
   return {
     registeredFns,
@@ -254,6 +256,7 @@ export {
   createScope,
   notifySubscribers,
   info,
+  defaultScope,
 };
 
 export * from './internal/event-helpers';

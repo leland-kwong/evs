@@ -14,12 +14,15 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "atomic-state": "github:leland-kwong/atomic-state#v1.0"
+    "atomic-state": "github:leland-kwong/atomic-state#v1.0",
+    "is-plain-object": "^3.0.0",
+    "hast-util-to-dom": "^2.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.8.4",
     "@babel/preset-env": "^7.8.4",
     "babel-jest": "^25.1.0",
+    "classnames": "^2.2.6",
     "clean-webpack-plugin": "^3.0.0",
     "eslint": "^6.1.0",
     "eslint-config-airbnb": "^18.0.1",
@@ -27,7 +30,6 @@
     "eslint-plugin-jest": "^23.7.0",
     "eslint-plugin-jsx-a11y": "^6.2.3",
     "eslint-plugin-react": "^7.18.3",
-    "html-escaper": "^2.0.0",
     "html-webpack-plugin": "^3.2.0",
     "jest": "^25.1.0",
     "morphdom": "^2.5.12",

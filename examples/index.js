@@ -1,6 +1,7 @@
-/* global document, performance */
+/* global document, performance, window */
 import morphdom from 'morphdom';
 import * as atomicState from 'atomic-state/lib';
+import toDOM from 'hast-util-to-dom';
 import * as evs from '../src/index';
 import {
   isEvsComponent,
@@ -9,7 +10,7 @@ import {
 } from '../src/internal/web-component';
 import { isBrowser } from '../src/constants';
 import { equal } from '../src/internal/equal';
-import './custom-templating';
+import { Hello, createElement } from './custom-templating';
 
 if (isBrowser) {
   watchComponentsAdded(document.body);
@@ -215,6 +216,7 @@ function benchFn(
       a + b) / results.length,
   };
 }
+window.benchFn = benchFn;
 
 const SetNewTodoText = (text) =>
   ({
@@ -628,9 +630,58 @@ function init() {
     evScope,
     {
       type: 'SetupMockTodos',
-      count: 100,
+      count: 2,
     },
   );
 }
 
-init();
+// init();
+
+(() => {
+  const root = makeUniqueElement('TodosApp');
+  const {
+    atom, swap, read, addWatch,
+  } = atomicState;
+  document.body.appendChild(root);
+
+  const dataSource = atom({
+    name: 'Leland',
+  });
+  const scope = evs.createScope('@vdomTest');
+  scope.subscribe((action) => {
+    console.log(`[${scope.namespace}]`, action);
+    const { type } = action;
+
+    switch (type) {
+    case 'SetName': {
+      const { name } = action;
+      return swap(dataSource, (state) =>
+        ({ ...state, name }));
+    }
+    case '@VdomTestInit':
+      return swap(dataSource, (state) =>
+        state);
+
+    default:
+      return read(dataSource);
+    }
+  });
+  function render(ref, key, oldState, newState) {
+    const dom = toDOM(
+      createElement(
+        Hello, {
+          name: newState.name,
+          scope,
+        },
+      ),
+    );
+    morphdom(
+      root,
+      dom,
+    );
+  }
+  addWatch(dataSource, '@vdomRender', render);
+  evs.notifySubscribers(scope, {
+    type: '@VdomTestInit',
+  });
+})();
