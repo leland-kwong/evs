@@ -31,8 +31,18 @@ module.exports = {
     "indent": [
       "error",
       2,
-      { "ignoredNodes": ["TemplateLiteral > *"] }
+      {
+        "ignoredNodes": ["TemplateLiteral > *"],
+        "ObjectExpression": "first"
+      },
     ],
+    "object-curly-newline": ["error", {
+      // "ObjectExpression": "always",
+      "consistent": true,
+      // "ObjectPattern": { "multiline": true },
+      // "ImportDeclaration": "never",
+      // "ExportDeclaration": { "multiline": true, "minProperties": 3 }
+    }],
     "no-unused-vars": [
       "error", { "varsIgnorePattern": "autoDom" }
     ]

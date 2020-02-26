@@ -2,6 +2,32 @@ import isPlainObject from 'is-plain-object';
 import { outdent } from 'outdent';
 import { isFunc } from './is-func';
 
+const eventTypes = {
+  onInput: 'evs.input',
+  onClick: 'evs.click',
+};
+
+const prepareProps = (obj) => {
+  const newO = {};
+  const keys = Object.keys(obj);
+  let i = 0;
+
+  while (i < keys.length) {
+    const k = keys[i];
+    const remapped = eventTypes[k];
+    const value = obj[k];
+
+    if (remapped) {
+      newO[remapped] = value;
+    } else {
+      newO[k] = value;
+    }
+
+    i += 1;
+  }
+  return newO;
+};
+
 const stringifyValueForLogging = (
   value,
 ) =>
@@ -48,10 +74,10 @@ function transformToProperType(newChildren, value) {
     return newChildren;
   }
 
-  // auto-expand nested list
   const isCollection = isArray(value);
 
   if (isCollection) {
+    // auto-expand nested list
     newChildren.push(
       ...value.reduce(
         transformToProperType,
@@ -87,20 +113,30 @@ const invalidCollectionValue = (value) =>
   isArray(value);
 
 const validateValue = (value) => {
+  if (process.env.NODE_ENV !== 'development') {
+    return value;
+  }
+
   const isInvalidCollection = isArray(value)
     && value.find(invalidCollectionValue);
 
   if (isFunc(value)
     || isInvalidCollection
   ) {
-    const stringified = stringifyValueForLogging(value);
+    const stringified = (() => {
+      const res = stringifyValueForLogging(value);
+      if (res.length > 300) {
+        return `${res.slice(0, 300)} ...`;
+      }
+      return res;
+    })();
 
     console.warn(outdent`
       Sorry,
 
       ${stringified}
 
-      is not a valid component. This commonly happens when
+      is not a valid component. This can happen when
       we either nested the arrays too deeply or forgot to
       wrap a component in an array.
 
@@ -186,11 +222,11 @@ const emptyProps = Object.freeze({});
 
 const getVNodeProps = (args) => {
   const firstArg = args[0];
-  const hasPropArg = isPlainObject(firstArg)
+  const hasProps = isPlainObject(firstArg)
     && !firstArg.tagName;
 
-  if (hasPropArg) {
-    const props = args.shift();
+  if (hasProps) {
+    const props = prepareProps(args.shift());
     const children = args;
 
     return { props, children };
@@ -206,7 +242,7 @@ const getVNodeProps = (args) => {
  * list component is:
  * [ArrayLike, projectFunction]
  */
-const isListComponent = (value) => {
+const isListProjection = (value) => {
   if (!value) {
     return false;
   }
@@ -219,6 +255,10 @@ const isListComponent = (value) => {
     && hasProjectFn;
 };
 
+const isDeepCollection = (value) =>
+  isArray(value)
+  && value.find(isArray);
+
 const getLispFunc = (lisp) =>
   lisp[0];
 
@@ -226,27 +266,22 @@ const getLispFunc = (lisp) =>
  * lisp structure is:
  * [function, ...args]
  */
-const isLisp = (v) =>
-  /**
-   * All truthy values in javascript are
-   * objects, so we can safely check this
-   * way. There can be those edge-cases
-   * where a plain object has a 0 property
-   * on it. But doing it this way is more
-   * performant since we don't need to do
-   * an extra `isArray` check everytime.
-   */
+const isLispLike = (v) =>
   v && isFunc(v[0]);
 
 const processLisp = (
   value,
 ) => {
-  if (!isLisp(value)) {
-    if (isListComponent(value)) {
+  if (!isLispLike(value)) {
+    if (isListProjection(value)) {
       const [items, project] = value;
 
       return items.map((v) =>
         processLisp(project(v)));
+    }
+
+    if (isDeepCollection(value)) {
+      return value.flat(1);
     }
 
     return value;
@@ -274,14 +309,6 @@ export const autoDom = new Proxy({}, {
 
     if (fromCache) return fromCache;
 
-    /**
-     * Supports the following formats
-     *
-     * [tagFn, nodeList]
-     * [tagFn, props, nodeList]
-     * [tagFn, props, node1, node2, ...]
-     * [tagFn, node1, node2, ...]
-     */
     const newElement = (props, children) =>
       VNode(tagName, props, children);
 

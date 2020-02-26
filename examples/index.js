@@ -10,7 +10,7 @@ import {
 } from '../src/internal/web-component';
 import { isBrowser } from '../src/constants';
 import { equal } from '../src/internal/equal';
-import { Hello, createElement } from './prototype.ldom';
+import { Hello, createElement, autoDom } from './prototype.ldom';
 
 if (isBrowser) {
   watchComponentsAdded(document.body);
@@ -84,7 +84,10 @@ const stateReducers = {
       ...state,
       todos: {
         ...state.todos,
-        [id]: { ...todo, ...changes },
+        [id]: {
+          ...todo,
+          ...changes,
+        },
       },
     };
   },
@@ -116,7 +119,8 @@ const stateReducers = {
         });
 
         return r;
-      }, {}),
+      }, {
+      }),
     };
   },
   EnableLogAction(state, action) {
@@ -175,7 +179,9 @@ function renderDom(domNode, htmlString) {
 }
 
 const noop = () =>
-  ({ type: '@noop' });
+  ({
+    type: '@noop',
+  });
 
 const makeUniqueElement = (id = 'some-id', tagType = 'div') => {
   const fromBefore = document.querySelector(id);
@@ -194,7 +200,9 @@ function setupDOM() {
   document.body
     .appendChild($root);
 
-  return { $root };
+  return {
+    $root,
+  };
 }
 
 function benchFn(
@@ -295,9 +303,7 @@ const TestComponent = (props, ns) => {
   };
 };
 
-const NullComponent = ({
-  $root,
-}) =>
+const NullComponent = ({ $root }) =>
   ({
     type: 'ComponentRender',
     rootNode: $root,
@@ -579,7 +585,9 @@ function init() {
 
   evs.notify(
     evScope,
-    { type: 'Init' },
+    {
+      type: 'Init',
+    },
   );
 
   evs.notify(
@@ -597,11 +605,31 @@ function init() {
   const rootDom = document.createElement('div');
   document.body.appendChild(rootDom);
 
-  const {
-    atom, swap,
-  } = atomicState;
+  const { atom, swap } = atomicState;
 
   const scope = evs.createScope('@vdomTest');
+
+  const BenchCreateElement = ({ size = 1000, numTests = 5 }) => {
+    const range = Array(size).fill(0);
+    const test = () => {
+      range.forEach(() => {
+        createElement(Hello, {
+          name: 'foo', scope,
+        });
+      });
+    };
+
+    // const vNode = createElement(Hello, { name: 'foo', scope });
+    // console.log(vNode);
+
+    console.log(
+      benchFn(test, null, numTests),
+    );
+  };
+
+  const effects = {
+    BenchCreateElement,
+  };
 
   const onEvent = (action, context) => {
     const { render, dataSource, rootReducer } = context;
@@ -610,16 +638,46 @@ function init() {
       dataSource, rootReducer, action,
     );
     render(nextState);
+
+    const { type } = action;
+    if (effects[type]) {
+      effects[type](action);
+    }
   };
 
+  const RunBench = (options) =>
+    ({
+      type: 'BenchCreateElement',
+      ...options,
+    });
+
   const render = (data) => {
+    const A = autoDom;
+
+    const TestUi = () => {
+      const runBench = scope.call(
+        RunBench,
+        { size: 200, numTests: 5 },
+      );
+
+      return (
+        [A.div,
+          [A.button,
+            { onClick: runBench,
+              class: 'foobar' },
+            'run bench']]
+      );
+    };
+
+    const view = () =>
+      (
+        [A.div,
+          [TestUi],
+          [Hello, { name: data.name,
+                    scope }]]
+      );
     const toDom = toDOM(
-      createElement(
-        Hello, {
-          name: data.name,
-          scope,
-        },
-      ),
+      createElement(view),
     );
     morphdom(rootDom, toDom);
   };

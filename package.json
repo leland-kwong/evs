@@ -5,7 +5,7 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "start": "webpack-dev-server --open",
+    "start": "NODE_ENV=development webpack-dev-server --open",
     "build": "webpack",
     "test": "jest --watch --no-cache",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
