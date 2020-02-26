@@ -35,19 +35,70 @@ const getSpecialValue = (v) => {
   return v;
 };
 
+function transformToProperType(newChildren, value) {
+  if (value && value.isVNode) {
+    newChildren.push(value);
+    return newChildren;
+  }
+
+  const isFalsy = value === false
+    || value === null;
+  // ignore falsy values
+  if (isFalsy) {
+    return newChildren;
+  }
+
+  // auto-expand nested list
+  const isCollection = isArray(value);
+
+  if (isCollection) {
+    newChildren.push(
+      ...value.reduce(
+        transformToProperType,
+        [],
+      ),
+    );
+    return newChildren;
+  }
+
+  newChildren.push({ type: 'text', value });
+  return newChildren;
+}
+
+// hast-compatible vnode
+function VNode(tagName, props, children) {
+  return {
+    type: 'element',
+    tagName,
+    properties: getSpecialValue(props),
+    // TODO: definitely not optimized right now
+    children: children.reduce(
+      transformToProperType,
+      [],
+    ),
+    isVNode: true,
+  };
+}
+
 const identity = (v) =>
   v;
 
+const invalidCollectionValue = (value) =>
+  isArray(value);
+
 const validateValue = (value) => {
-  const isNestedArray = isArray(value)
-    && value.find(isArray);
+  const isInvalidCollection = isArray(value)
+    && value.find(invalidCollectionValue);
 
   if (isFunc(value)
-    || isNestedArray) {
+    || isInvalidCollection
+  ) {
+    const stringified = stringifyValueForLogging(value);
+
     console.warn(outdent`
       Sorry,
 
-      ${stringifyValueForLogging(value)}
+      ${stringified}
 
       is not a valid component. This commonly happens when
       we either nested the arrays too deeply or forgot to
@@ -71,7 +122,38 @@ const validateValue = (value) => {
 
       \`\`\`
     `);
+
+    const styles = {
+      container: `
+        background: #3c3601;
+        color: #ffff4a;
+        padding: .5rem;
+        font-size: 14px;
+        font-weight: normal;
+        font-family: monospace`,
+      helpText: `
+        font-weight: bold`,
+    };
+
+    return VNode(
+      'div',
+      { style: styles.container },
+      [
+        VNode(
+          'div',
+          { style: styles.helpText },
+          ['invalid component detected:'],
+        ),
+        VNode(
+          'pre',
+          {},
+          [stringified],
+        ),
+      ],
+    );
   }
+
+  return value;
 };
 
 const sliceList = (
@@ -87,10 +169,10 @@ const sliceList = (
 
   while (i < endAt) {
     const arg = arrayLike[i];
-    const value = callback(arg);
+    const value = validateValue(
+      callback(arg),
+    );
     const currentIndex = i - startFrom;
-
-    validateValue(value);
 
     args[currentIndex] = value;
 
@@ -179,51 +261,6 @@ const processLisp = (
 
   return processLisp(nextValue);
 };
-
-function transformToProperType(newChildren, value) {
-  if (value && value.isVNode) {
-    newChildren.push(value);
-    return newChildren;
-  }
-
-  const isFalsy = value === false
-    || value === null;
-  // ignore falsy values
-  if (isFalsy) {
-    return newChildren;
-  }
-
-  // auto-expand nested list
-  const isCollection = isArray(value);
-
-  if (isCollection) {
-    newChildren.push(
-      ...value.reduce(
-        transformToProperType,
-        [],
-      ),
-    );
-    return newChildren;
-  }
-
-  newChildren.push({ type: 'text', value });
-  return newChildren;
-}
-
-// hast-compatible vnode
-function VNode(tagName, props, children) {
-  return {
-    type: 'element',
-    tagName,
-    properties: getSpecialValue(props),
-    // TODO: as an optimization, we can update in place
-    children: children.reduce(
-      transformToProperType,
-      [],
-    ),
-    isVNode: true,
-  };
-}
 
 const tagCache = new Map();
 
