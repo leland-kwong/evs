@@ -10,7 +10,7 @@ import {
 } from '../src/internal/web-component';
 import { isBrowser } from '../src/constants';
 import { equal } from '../src/internal/equal';
-import { Hello, createElement } from './custom-templating';
+import { Hello, createElement } from './prototype.ldom';
 
 if (isBrowser) {
   watchComponentsAdded(document.body);

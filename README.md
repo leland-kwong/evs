@@ -9,34 +9,59 @@ Data-driven DOM events for web applications.
 * no more event listener management
 * no more callbacks in your render
 
-## Example
-
 # EVS components
 
-## Example
+## Setting up webpack and eslint
+
+Having to require common functions like `div`, `input` for every new file gets tedious very quickly. We can set these up to be "globals" in webpack and eslint for specific file types.
+
+### Webpack globals
+
+In our `webpack.config.js` file:
 
 ```js
-const myNamespace = evs.createScope('myNamespace');
-const MyComponent = (
-  { text },
-  currentNamespace
-) => {
-  return `
-    <input
-      type="text"
-      value="${text}"
-    />
-  `;
-}
 
-render(domNode, `
-  <div class="app">
-    <div evs._render="${myNamespace.call(
-      MyComponent, {
-        text: 'foobar'
-      }
-    )}">
-    </div>
-  </div>
-`)
+const htmlGlobals = require('./src/internal/ldom-globals.json');
+
+module.exports = {
+  ...,
+  plugins: [
+    /*
+    * This transforms all ldom calls to `autoDom.{tagName}.
+    */
+    new webpack.DefinePlugin({
+      ...Object.keys(htmlGlobals).reduce((defs, key) => {
+        const d = defs;
+
+        d[key] = `autoDom.${key}`;
+        return d;
+      }, {}),
+    }),
+  ]
+}
+```
+
+### eslint globals
+
+In our `eslintrc.js` file:
+
+```js
+{
+  ...,
+  "no-unused-vars": [
+    "error", { "varsIgnorePattern": "autoDom" }
+  ],
+  "overrides": [
+    {
+      files: ['*.ldom.js'],
+      globals: ldomGlobals
+    }
+  ]
+}
+```
+
+## Component Example
+
+```js
+const scope = evs.createScope('myNamespace');
 ```

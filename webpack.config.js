@@ -1,6 +1,8 @@
 const path = require('path');
+const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
+const htmlGlobals = require('./src/internal/ldom-globals.json');
 
 module.exports = {
   mode: 'development',
@@ -14,6 +16,14 @@ module.exports = {
     hot: true,
   },
   plugins: [
+    new webpack.DefinePlugin({
+      ...Object.keys(htmlGlobals).reduce((defs, key) => {
+        const d = defs;
+
+        d[key] = `autoDom.${key}`;
+        return d;
+      }, {}),
+    }),
     new CleanWebpackPlugin(),
     new HtmlWebpackPlugin({
       title: 'Hot Module Replacement',
