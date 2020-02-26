@@ -1,5 +1,8 @@
 import isPlainObject from 'is-plain-object';
+import outdent from 'outdent';
 import { isFunc } from './is-func';
+
+const toValue = Symbol('@toValue');
 
 /**
  * Build a custom inspector that maps the lisp structure
@@ -11,8 +14,9 @@ const { isArray } = Array;
 
 const getSpecialValue = (v) => {
   const dataFn = v
-    ? v.$specialValue
+    ? v[toValue]
     : null;
+
   if (dataFn) {
     return dataFn(v);
   }
@@ -30,13 +34,6 @@ const sliceList = (
   endAt = arrayLike.length,
 ) => {
   const { length } = arrayLike;
-  const isSingleArg = length === 2;
-
-  if (isSingleArg) {
-    const firstArg = arrayLike[1];
-    return [callback(firstArg)];
-  }
-
   let i = startFrom;
   // mutated in while loop
   const args = new Array(length - startFrom);
@@ -54,34 +51,90 @@ const sliceList = (
 
 const emptyProps = Object.freeze({});
 
-const isEmptyProps = (v) =>
-  v === emptyProps;
-
 const getVNodeProps = (args) => {
   const firstArg = args[0];
-  if (isPlainObject(firstArg)
-    && !firstArg.tagName) {
-    return firstArg;
-  }
-  return emptyProps;
-};
+  const hasPropArg = isPlainObject(firstArg)
+    && !firstArg.tagName;
 
-const getVNodeChildren = (
-  args, props, processAsLisp,
-) => {
-  const firstArg = args[0];
+  if (hasPropArg) {
+    // pop off first item for props
+    const props = args.shift();
+    // use whats left in the array as the children
+    const children = args;
+
+    return { props, children };
+  }
+
   const isNodeList = isArray(firstArg);
 
   if (isNodeList) {
-    return firstArg.map(processAsLisp);
+    return { children: firstArg };
   }
 
-  const hasProps = !isEmptyProps(props);
-  if (hasProps) {
-    return sliceList(args, identity, 1);
+  return { props: emptyProps, children: args };
+};
+
+const listComponentFormat = outdent`
+  \`\`\`js
+  const items = [1, 2, 3];
+  const mapFunction = (num) => [li, num]
+  const ListComponent = (
+    [ul,
+      [items, // <- array must be first value
+        mapFunction]] // <- function must be second value
+  )
+  \`\`\`
+`;
+
+const validateListComponent = (
+  isListArg, hasProjectFn,
+) => {
+  const isMissingProjectFn = isListArg
+    && !hasProjectFn;
+
+  if (isMissingProjectFn) {
+    throw new Error(outdent`
+      List component is missing a map function.
+      For example, we should do:
+
+      ${listComponentFormat}
+    `);
   }
 
-  return args;
+  return isListArg && hasProjectFn;
+};
+
+/**
+ * list component is:
+ * [ArrayLike, projectFunction]
+ */
+const isListComponent = (value) => {
+  if (!value) {
+    return false;
+  }
+
+  const firstArg = value[0];
+  const isListArg = isArray(firstArg);
+  const hasProjectFn = typeof value[1] === 'function';
+
+  return validateListComponent(
+    isListArg,
+    hasProjectFn,
+  );
+};
+
+const validateVNodeResult = (value) => {
+  if (isArray(value)) {
+    throw new Error(outdent`
+      We found \`${value.toString().slice(0, 20)}\` as a vdom value.
+      Did you mean for this to be a list component?
+      We can make a list component by doing:
+
+      ${listComponentFormat}
+    `);
+  }
+
+  return value;
 };
 
 const getLispFunc = (lisp) =>
@@ -107,26 +160,41 @@ const processLisp = (
   value,
 ) => {
   if (!isLisp(value)) {
-    return value;
+    if (isListComponent(value)) {
+      const [items, project] = value;
+
+      return items.map((v) =>
+        processLisp(project(v)));
+    }
+
+    return validateVNodeResult(value);
   }
 
   const f = getLispFunc(value);
   // ignore first value since it
   // is the lisp function.
   const args = sliceList(value, processLisp, 1);
-  const props = getVNodeProps(args);
-  const children = getVNodeChildren(args, props, processLisp);
+  const { props, children } = getVNodeProps(args);
   const nextValue = f(props, children);
 
   return processLisp(nextValue);
 };
 
-function coerceToProperType(node) {
-  if (typeof node === 'string'
-    || typeof node === 'number') {
-    return { type: 'text', value: node };
+function transformToProperType(newChildren, value) {
+  if (value && value.isVNode) {
+    newChildren.push(value);
+    return newChildren;
   }
-  return node;
+
+  const isFalsy = value === false
+    || value === null;
+  // ignore falsy values
+  if (isFalsy) {
+    return newChildren;
+  }
+
+  newChildren.push({ type: 'text', value });
+  return newChildren;
 }
 
 // hast-compatible vnode
@@ -136,9 +204,11 @@ function VNode(tagName, props, children) {
     tagName,
     properties: getSpecialValue(props),
     // TODO: as an optimization, we can update in place
-    children: children.map(
-      coerceToProperType,
+    children: children.reduce(
+      transformToProperType,
+      [],
     ),
+    isVNode: true,
   };
 }
 
@@ -171,8 +241,10 @@ export const autoDom = new Proxy({}, {
   },
 });
 
-export function createElement(templateFn, arg) {
+function createElement(templateFn, arg) {
   return processLisp(
     templateFn(arg),
   );
 }
+
+export { createElement, toValue };

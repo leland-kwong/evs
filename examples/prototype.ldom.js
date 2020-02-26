@@ -4,6 +4,7 @@ import * as evs from '../src';
 const {
   autoDom,
   createElement,
+  toValue,
 } = require('../src/internal/auto-dom');
 
 /**
@@ -90,7 +91,7 @@ function makeChainable(chainApi, [key, fn]) {
 
 const props = Object.entries(propsApi)
   .reduce(makeChainable, {
-    $specialValue(self) {
+    [toValue](self) {
       return self.props;
     },
   });
@@ -134,7 +135,6 @@ const NameInput = ({ name, scope }) =>
   [label,
     'Name: ',
     [input, props
-      .type('text')
       .prop('value', name)
       .setScope(scope)
       .on(
@@ -146,15 +146,25 @@ const NameInput = ({ name, scope }) =>
 const Greeting = ({ name }) =>
   [h1, 'Hello ', name];
 
-const MultiChars = ({ name }) =>
-  [div, [...name].map((char) =>
-    [strong, char])];
+const map = (
+  items,
+  project = (v) =>
+    v,
+) =>
+  [items, project];
+
+const numbers = [1, 2, 3];
+const boldNumber = (num) =>
+  [strong, num + 1];
+
+const BoldNumbers = () =>
+  [div, map(numbers, boldNumber)];
 
 const Hello = ({ name, scope }) =>
   [div,
     [NameInput, { name, scope }],
     [Greeting, { name }],
-    [MultiChars, { name }]];
+    [BoldNumbers]];
 
 export {
   TodoApp,
