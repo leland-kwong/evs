@@ -1,10 +1,21 @@
 import isPlainObject from 'is-plain-object';
-import outdent from 'outdent';
+import { outdent } from 'outdent';
 import { isFunc } from './is-func';
+
+const stringifyValueForLogging = (
+  value,
+) =>
+  JSON.stringify(value, (key, v) => {
+    if (isFunc(v)) {
+      return v.toString();
+    }
+    return v;
+  });
 
 const toValue = Symbol('@toValue');
 
-/**
+/*
+ * TODO:
  * Build a custom inspector that maps the lisp structure
  * to the dom? This could be awesome if we can manage it.
  * Not sure about the complexity though.
@@ -27,6 +38,42 @@ const getSpecialValue = (v) => {
 const identity = (v) =>
   v;
 
+const validateValue = (value) => {
+  const isNestedArray = isArray(value)
+    && value.find(isArray);
+
+  if (isFunc(value)
+    || isNestedArray) {
+    console.warn(outdent`
+      Sorry,
+
+      ${stringifyValueForLogging(value)}
+
+      is not a valid component. This commonly happens when
+      we either nested the arrays too deeply or forgot to
+      wrap a component in an array.
+
+      The supported formats are:
+
+      \`\`\`javascript
+
+      // basic component
+      [Function, value1, value2, ...]
+
+      // component with props
+      [Function, Object, value1, value2, ...]
+
+      // collection of nodes
+      [value1, value2, ...]
+
+      // collection of nodes with a map function
+      [Array, Function]
+
+      \`\`\`
+    `);
+  }
+};
+
 const sliceList = (
   arrayLike,
   callback = identity,
@@ -40,9 +87,13 @@ const sliceList = (
 
   while (i < endAt) {
     const arg = arrayLike[i];
-    const val = callback(arg);
+    const value = callback(arg);
+    const currentIndex = i - startFrom;
 
-    args[i - startFrom] = val;
+    validateValue(value);
+
+    args[currentIndex] = value;
+
     i += 1;
   }
 
@@ -57,51 +108,16 @@ const getVNodeProps = (args) => {
     && !firstArg.tagName;
 
   if (hasPropArg) {
-    // pop off first item for props
     const props = args.shift();
-    // use whats left in the array as the children
     const children = args;
 
     return { props, children };
   }
 
-  const isNodeList = isArray(firstArg);
-
-  if (isNodeList) {
-    return { children: firstArg };
-  }
-
-  return { props: emptyProps, children: args };
-};
-
-const listComponentFormat = outdent`
-  \`\`\`js
-  const items = [1, 2, 3];
-  const mapFunction = (num) => [li, num]
-  const ListComponent = (
-    [ul,
-      [items, // <- array must be first value
-        mapFunction]] // <- function must be second value
-  )
-  \`\`\`
-`;
-
-const validateListComponent = (
-  isListArg, hasProjectFn,
-) => {
-  const isMissingProjectFn = isListArg
-    && !hasProjectFn;
-
-  if (isMissingProjectFn) {
-    throw new Error(outdent`
-      List component is missing a map function.
-      For example, we should do:
-
-      ${listComponentFormat}
-    `);
-  }
-
-  return isListArg && hasProjectFn;
+  return {
+    props: emptyProps,
+    children: args,
+  };
 };
 
 /**
@@ -117,24 +133,8 @@ const isListComponent = (value) => {
   const isListArg = isArray(firstArg);
   const hasProjectFn = typeof value[1] === 'function';
 
-  return validateListComponent(
-    isListArg,
-    hasProjectFn,
-  );
-};
-
-const validateVNodeResult = (value) => {
-  if (isArray(value)) {
-    throw new Error(outdent`
-      We found \`${value.toString().slice(0, 20)}\` as a vdom value.
-      Did you mean for this to be a list component?
-      We can make a list component by doing:
-
-      ${listComponentFormat}
-    `);
-  }
-
-  return value;
+  return isListArg
+    && hasProjectFn;
 };
 
 const getLispFunc = (lisp) =>
@@ -167,7 +167,7 @@ const processLisp = (
         processLisp(project(v)));
     }
 
-    return validateVNodeResult(value);
+    return value;
   }
 
   const f = getLispFunc(value);
@@ -190,6 +190,19 @@ function transformToProperType(newChildren, value) {
     || value === null;
   // ignore falsy values
   if (isFalsy) {
+    return newChildren;
+  }
+
+  // auto-expand nested list
+  const isCollection = isArray(value);
+
+  if (isCollection) {
+    newChildren.push(
+      ...value.reduce(
+        transformToProperType,
+        [],
+      ),
+    );
     return newChildren;
   }
 

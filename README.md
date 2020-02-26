@@ -11,6 +11,31 @@ Data-driven DOM events for web applications.
 
 # EVS components
 
+## Examples
+
+### Render a component
+
+```js
+const Hello = ({ name }) => {
+  return (
+    [div,
+      [p, name]]
+  )
+}
+```
+
+### Render a list
+```js
+const numbers = [1, 2]
+const Doubled = num => num * 2
+const List = [numbers, Doubled]
+
+// lists are also automatically expanded
+const AsFragment = (
+  [div, 1, [List], [List]] // <div>1 2 4 2 4</div>
+)
+```
+
 ## Setting up webpack and eslint
 
 Having to require common functions like `div`, `input` for every new file gets tedious very quickly. We can set these up to be "globals" in webpack and eslint for specific file types.
