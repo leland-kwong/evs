@@ -1,4 +1,3 @@
-import classnames from 'classnames';
 import * as evs from '../src';
 import { nativeElements as A } from '../src/internal/auto-dom';
 
@@ -27,10 +26,8 @@ const numbers = [3, 4, 5];
 const BoldNumbers = () =>
   [BoldNum, { numbers }];
 
-const Greeting = ({ name, children }) =>
-  [A.h1, 'Hello ', name,
-    children,
-  ];
+const Greeting = ({ name }) =>
+  [A.h1, 'Hello ', name];
 
 const Hello = ({ name, scope }) =>
   [A.div, { class: 'Hello' },
