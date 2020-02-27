@@ -21,19 +21,28 @@ const isElement = (node) =>
     ? node.isVNode
     : false);
 
-const mapProps = {
+const set = (obj, key, value) => {
+  const o = obj;
+
+  o[key] = value;
+  return obj;
+};
+
+const remapProp = {
+  // do nothing here because we don't
+  // want it reflected to the dom during
+  // rendering
+  children() {},
+
   class(value, props) {
-    const p = props;
-    p.className = value;
+    set(props, 'className', value);
   },
 
   onInput(value, props, attrs) {
-    const a = attrs;
-    a['evs.input'] = value;
+    set(attrs, 'evs.input', value);
   },
   onClick(value, props, attrs) {
-    const a = attrs;
-    a['evs.click'] = value;
+    set(attrs, 'evs.click', value);
   },
 };
 
@@ -54,34 +63,27 @@ const stringifyValueForLogging = (
  * Not sure about the complexity though.
  */
 
-const prepareVNodeData = (obj, children) => {
-  const oProps = { children };
+const prepareVNodeData = (oProps) => {
   const props = {};
   const attrs = {};
-  const { style } = obj;
-  const keys = Object.keys(obj);
+  const { style } = oProps;
+  const keys = Object.keys(oProps);
   let i = 0;
 
   while (i < keys.length) {
     const k = keys[i];
-    const remapper = mapProps[k];
-    const value = obj[k];
+    const remapper = remapProp[k];
+    const value = oProps[k];
 
     if (remapper) {
       remapper(value, props, attrs);
     } else {
       props[k] = value;
     }
-    oProps[k] = value;
 
     i += 1;
   }
-  return {
-    oProps,
-    props,
-    attrs,
-    style,
-  };
+  return { props, attrs, style };
 };
 
 function coerceToVnode(newChildren, value) {
@@ -104,9 +106,9 @@ function coerceToVnode(newChildren, value) {
   return newChildren;
 }
 
-function VNode(tagName, data) {
-  const { oProps, props, attrs, style } = data;
+function VNode(tagName, oProps) {
   const { children } = oProps;
+  const { props, attrs, style } = prepareVNodeData(oProps, children);
 
   return {
     sel: tagName,
@@ -244,7 +246,8 @@ const getVNodeProps = (args) => {
     : {};
   const children = args.flat();
 
-  return prepareVNodeData(props, children);
+  // don't mutate the original
+  return { ...props, children };
 };
 
 const getLispFunc = (lisp) =>
@@ -275,14 +278,7 @@ const processLisp = (
   // is the lisp function.
   const args = sliceList(value, processLisp, 1);
   const props = getVNodeProps(args);
-  const nextValue = f.isVNodeFactory
-    ? f(props)
-    /**
-     * vnodes have a different props definition,
-     * so we use the original for functional
-     * components.
-     */
-    : f(props.oProps);
+  const nextValue = f(props);
 
   return processLisp(nextValue);
 };
