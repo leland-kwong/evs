@@ -615,12 +615,6 @@ function init() {
   const scope = evs.createScope('@vdomTest');
 
   const BenchCreateElement = ({ size = 1000, numTests = 5 }) => {
-    console.log(
-      createElement(
-        [Hello, { name: 'foo',
-                  scope }],
-      ),
-    );
     const range = Array(size).fill(0);
     const test = () => {
       range.forEach(() => {
@@ -705,24 +699,27 @@ function init() {
         RunBench,
         { size: 200, numTests: 5 },
       );
+      const btnRunBench = (
+        [A.button,
+          { onClick: runBench },
+          'create vnodes',
+        ]);
 
       const measureIteration = scope.call(
         RunMeasureIteration,
       );
+      const btnMeasureIteration = (
+        [A.button,
+          { onClick: measureIteration },
+          'measure iteration',
+        ]);
 
       return (
         [Group,
           [A.div,
             [A.h2, 'Perf testing'],
-            [A.button,
-              { onClick: runBench },
-              'create vnodes',
-            ],
-            [A.button,
-              { onClick: measureIteration,
-                autofocus: true },
-              'measure iteration',
-            ],
+            btnRunBench,
+            btnMeasureIteration,
           ],
         ]
       );
