@@ -78,19 +78,6 @@ function transformToProperType(newChildren, value) {
     return newChildren;
   }
 
-  const isCollection = isArray(value);
-
-  if (isCollection) {
-    // auto-expand nested list
-    newChildren.push(
-      ...value.reduce(
-        transformToProperType,
-        [],
-      ),
-    );
-    return newChildren;
-  }
-
   newChildren.push({ type: 'text', value });
   return newChildren;
 }
@@ -112,7 +99,6 @@ function VNode(tagName, props) {
     type: 'element',
     tagName,
     properties: getSpecialValue(props),
-    // TODO: definitely not optimized right now
     children: children.reduce(
       transformToProperType,
       [],
