@@ -9,6 +9,8 @@ import { elementTypes } from '../element-types';
 import { isArray, isFunc,
   setValue, stringifyValueForLogging } from '../utils';
 
+const vnodeType = Symbol('@vnode');
+
 const patch = snabbdom.init([
   snabbdomAttributes,
   snabbdomClass,
@@ -34,9 +36,9 @@ const patch = snabbdom.init([
   snabbdomStyle,
 ]);
 
-const isElement = (node) =>
+const isVnode = (node) =>
   (node
-    ? node.isVNode
+    ? node[vnodeType]
     : false);
 
 const remapProp = {
@@ -60,7 +62,7 @@ const remapProp = {
   },
 };
 
-const prepareVNodeData = (oProps) => {
+const prepareVnodeData = (oProps) => {
   const props = {};
   const attrs = {};
   const { style } = oProps;
@@ -84,7 +86,7 @@ const prepareVNodeData = (oProps) => {
 };
 
 function coerceToVnode(newChildren, value) {
-  if (isElement(value)) {
+  if (isVnode(value)) {
     newChildren.push(value);
     return newChildren;
   }
@@ -101,9 +103,9 @@ function coerceToVnode(newChildren, value) {
   return newChildren;
 }
 
-function VNode(tagName, oProps) {
+function Vnode(tagName, oProps) {
   const { children } = oProps;
-  const { props, attrs, style } = prepareVNodeData(oProps, children);
+  const { props, attrs, style } = prepareVnodeData(oProps, children);
 
   return {
     sel: tagName,
@@ -113,7 +115,7 @@ function VNode(tagName, oProps) {
     children: children.reduce(
       coerceToVnode, [],
     ),
-    isVNode: true,
+    [vnodeType]: true,
   };
 }
 
@@ -183,16 +185,16 @@ const validateValue = (value) => {
         font-weight: bold`,
     };
 
-    return VNode(
+    return Vnode(
       'div',
       { style: styles.container },
       [
-        VNode(
+        Vnode(
           'div',
           { style: styles.helpText },
           ['invalid component detected:'],
         ),
-        VNode(
+        Vnode(
           'pre',
           {},
           [stringified],
@@ -231,10 +233,10 @@ const sliceList = (
   return [args, hasArrayValue];
 };
 
-const getVNodeProps = (args, hasArrayValue) => {
+const getVnodeProps = (args, hasArrayValue) => {
   const firstArg = args[0];
   const hasProps = isPlainObject(firstArg)
-    && !isElement(firstArg);
+    && !isVnode(firstArg);
   const props = hasProps
     // remove the first argument
     ? args.shift()
@@ -270,7 +272,7 @@ const processLisp = (value) => {
   const f = getLispFunc(value);
   // everything after the first value
   const [args, hasArrayValue] = sliceList(value, processLisp, 1);
-  const props = getVNodeProps(args, hasArrayValue);
+  const props = getVnodeProps(args, hasArrayValue);
   const nextValue = f(props);
 
   return processLisp(nextValue);
@@ -292,9 +294,9 @@ const processLisp = (value) => {
  */
 const defineElement = (tagName) => {
   const elementFactory = (props) =>
-    VNode(tagName, props);
+    Vnode(tagName, props);
 
-  elementFactory.isVNodeFactory = true;
+  elementFactory.isVnodeFactory = true;
 
   return elementFactory;
 };
@@ -324,5 +326,5 @@ export {
   createElement,
   nativeElements,
   renderToDomNode,
-  isElement,
+  isVnode,
 };
