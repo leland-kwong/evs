@@ -13,6 +13,24 @@ const patch = snabbdom.init([
   snabbdomAttributes,
   snabbdomClass,
   snabbdomProps,
+  /*
+   * TODO:
+   * We should do all modifications via just
+   * a single props object like react so
+   * we don't have to create 3 different objects
+   * to separate things out. This dramatically
+   * simplifies the api and our code because we
+   * don't have to do conditional checks for
+   * things like if it is a vnode, then don't
+   * include the children, etc...
+   *
+   * TODO:
+   * Style module seems to be way over-optimized
+   * for our use case. Its not reapplying styles
+   * when they don't change for some reason. We
+   * should just move all the styling logic to
+   * the props object.
+   */
   snabbdomStyle,
 ]);
 
