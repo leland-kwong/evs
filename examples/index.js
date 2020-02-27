@@ -273,6 +273,7 @@ const sideEffects = {
   const rootDom = document.createElement('div');
   document.body.appendChild(rootDom);
 
+  const A = nativeElements;
   const { atom, swap } = atomicState;
 
   const scope = evs.createScope('@vdomTest');
@@ -321,10 +322,12 @@ const sideEffects = {
 
   const onEvent = (action, context) => {
     const { render, dataSource, rootReducer } = context;
-    console.log(`[${scope.namespace}]`, action);
     const nextState = swap(
       dataSource, rootReducer, action,
     );
+    if (nextState.logAction) {
+      console.log(`[${scope.namespace}]`, action, nextState);
+    }
     render(nextState);
 
     const { type } = action;
@@ -344,19 +347,32 @@ const sideEffects = {
       type: 'MeasureIteration',
     });
 
-  const render = (data) => {
-    const A = nativeElements;
-    const Group = ({ children }) =>
-      children.map((node) => {
-        if (isElement(node)) {
-          const { props } = node;
-          return { ...node,
-                   props: { ...props,
-                            class: `${props.class || ''} AGroup` } };
-        }
-        return node;
-      });
+  const ToggleLogger = (enabled) =>
+    ({
+      type: 'ToggleLogAction',
+      enabled,
+    });
 
+  const dataSource = atom({
+    name: 'Leland',
+    logAction: false,
+  });
+
+  const DevDashboard = ({ logAction }) =>
+    [A.form,
+      [A.label,
+        [A.input, { type: 'checkbox',
+                    class: 'dev-checkbox',
+                    checked: logAction,
+                    onChange: scope.call(
+                      ToggleLogger,
+                      evs.InputChecked,
+                    ) },
+        ], 'log action',
+      ],
+    ];
+
+  const render = (data) => {
     const PerfTests = () => {
       const runBench = scope.call(
         RunBench,
@@ -378,17 +394,17 @@ const sideEffects = {
         ]);
 
       return (
-        [Group,
-          [A.div,
-            [A.h2, 'Perf testing'],
-            btnRunBench,
-            btnMeasureIteration,
-          ]]
+        [A.div,
+          [A.h2, 'Perf testing'],
+          btnRunBench,
+          btnMeasureIteration,
+        ]
       );
     };
 
     const View = () =>
       [A.div,
+        [DevDashboard, data],
         [PerfTests],
         [Hello, { name: data.name,
                   scope }]];
@@ -400,6 +416,11 @@ const sideEffects = {
     const { type } = action;
 
     switch (type) {
+    case 'ToggleLogAction': {
+      const { enabled } = action;
+      return { ...state, logAction: enabled };
+    }
+
     case 'SetName': {
       const { name } = action;
       return { ...state, name };
@@ -412,10 +433,6 @@ const sideEffects = {
       return state;
     }
   };
-
-  const dataSource = atom({
-    name: 'Leland',
-  });
 
   evs.subscribe(scope, onEvent,
     { render, rootReducer, dataSource });

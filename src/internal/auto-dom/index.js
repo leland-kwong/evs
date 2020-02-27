@@ -3,8 +3,8 @@ import { outdent } from 'outdent';
 import * as snabbdom from 'snabbdom';
 import snabbdomAttributes from 'snabbdom/modules/attributes';
 import snabbdomClass from 'snabbdom/modules/class';
-import snabbdomProps from 'snabbdom/modules/props';
 import snabbdomStyle from 'snabbdom/modules/style';
+import snabbdomProps from './snabbdom-modules/props';
 import { elementTypes } from '../element-types';
 import { isArray, isFunc,
   setValue, stringifyValueForLogging } from '../utils';
@@ -31,6 +31,9 @@ const remapProp = {
     setValue(props, 'className', value);
   },
 
+  onChange(value, props, attrs) {
+    setValue(attrs, 'evs.change', value);
+  },
   onInput(value, props, attrs) {
     setValue(attrs, 'evs.input', value);
   },
@@ -76,9 +79,7 @@ function coerceToVnode(newChildren, value) {
   }
 
   // everything else we consider text
-  newChildren.push({
-    text: value,
-  });
+  newChildren.push({ text: value });
   return newChildren;
 }
 
@@ -92,8 +93,7 @@ function VNode(tagName, oProps) {
     props: oProps,
     data: { attrs, props, style },
     children: children.reduce(
-      coerceToVnode,
-      [],
+      coerceToVnode, [],
     ),
     isVNode: true,
   };
@@ -187,32 +187,33 @@ const validateValue = (value) => {
 };
 
 const sliceList = (
-  arrayLike,
+  lisp = [],
   callback = identity,
   startFrom = 0,
-  endAt = arrayLike.length,
+  endAt = lisp.length,
 ) => {
-  const { length } = arrayLike;
+  const { length } = lisp;
+  let hasArrayValue = false;
   let i = startFrom;
   // mutated in while loop
   const args = new Array(length - startFrom);
 
   while (i < endAt) {
-    const arg = arrayLike[i];
+    const arg = lisp[i];
     const value = validateValue(
       callback(arg),
     );
     const currentIndex = i - startFrom;
 
+    hasArrayValue = hasArrayValue || isArray(value);
     args[currentIndex] = value;
-
     i += 1;
   }
 
-  return args;
+  return [args, hasArrayValue];
 };
 
-const getVNodeProps = (args) => {
+const getVNodeProps = (args, hasArrayValue) => {
   const firstArg = args[0];
   const hasProps = isPlainObject(firstArg)
     && !isElement(firstArg);
@@ -221,7 +222,8 @@ const getVNodeProps = (args) => {
     ? args.shift()
     : {};
   // auto-expand children
-  const children = args.flat();
+  const children = hasArrayValue
+    ? args.flat() : args;
 
   // don't mutate the original
   return { ...props, children };
@@ -230,20 +232,17 @@ const getVNodeProps = (args) => {
 const getLispFunc = (lisp) =>
   lisp[0];
 
-/**
- * lisp structure is:
- * [function, ...args]
- */
-const isLispLike = (v) =>
-  isArray(v) && isFunc(v[0]);
+const processLisp = (value) => {
+  const isList = isArray(value);
+  /**
+   * lisp structure is:
+   * [function, ...args]
+   */
+  const isLispLike = isList
+    && isFunc(value[0]);
 
-const processLisp = (
-  value,
-) => {
-  if (!isLispLike(value)) {
-    const isCollection = isArray(value);
-
-    if (isCollection) {
+  if (!isLispLike) {
+    if (isList) {
       return value.map(processLisp);
     }
 
@@ -251,10 +250,9 @@ const processLisp = (
   }
 
   const f = getLispFunc(value);
-  // ignore first value since it
-  // is the lisp function.
-  const args = sliceList(value, processLisp, 1);
-  const props = getVNodeProps(args);
+  // everything after the first value
+  const [args, hasArrayValue] = sliceList(value, processLisp, 1);
+  const props = getVNodeProps(args, hasArrayValue);
   const nextValue = f(props);
 
   return processLisp(nextValue);

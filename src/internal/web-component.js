@@ -110,73 +110,6 @@ function initializeGlobalStyles() {
   );
 }
 
-/**
- * Forces the form input's dom property to always
- * be equal to the attribute value. This works
- * because morphdom always diffs based on attributes
- * rather than properties.
- */
-function forceFormInputImmutable() {
-  if (immutableFormInputInitialized) return;
-
-  document.addEventListener('input', (ev) => {
-    const { target } = ev;
-    const checkChanges = () => {
-      const inputType = target.getAttribute('type');
-
-      switch (inputType) {
-      case 'text': {
-        const attrValue = target.getAttribute('value');
-        const wasChangedExternally = !equal(
-          target.value,
-          attrValue,
-        );
-
-        if (wasChangedExternally) {
-          if (!hasEvsEvent(target)) {
-            console.warn(outdent`
-              [evs text input]
-              Did we forget to add an \`input\` handler?
-              Evs forces input controls to always be a
-              representation of the render. This is done
-              to make our code easier to reason about.`);
-          }
-          target.value = attrValue;
-        }
-        break;
-      }
-      case 'checkbox': {
-        const attrChecked = equal(
-          target.getAttribute('checked'),
-          '',
-        );
-        const wasChangedExternally = !equal(
-          target.checked,
-          attrChecked,
-        );
-
-        if (wasChangedExternally) {
-          if (!hasEvsEvent(target)) {
-            console.warn(outdent`
-              [evs checkbox]
-              Did we forget to add a \`change\` handler?
-              Evs forces input controls to always be a
-              representation of the render. This is done
-              to make our code easier to reason about.`);
-          }
-          target.checked = attrChecked;
-        }
-        break;
-      }
-      default:
-        break;
-      }
-    };
-
-    requestAnimationFrame(checkChanges);
-  });
-}
-
 export function watchComponentsAdded(domNode) {
   function processAddedNode(node) {
     walkDomElements(
@@ -198,6 +131,5 @@ export function watchComponentsAdded(domNode) {
     childList: true,
     subtree: true,
   });
-  forceFormInputImmutable();
   initializeGlobalStyles();
 }
