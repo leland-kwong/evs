@@ -41,9 +41,6 @@ module.exports = {
       // "ImportDeclaration": "never",
       // "ExportDeclaration": { "multiline": true, "minProperties": 3 }
     }],
-    "no-unused-vars": [
-      "error", { "varsIgnorePattern": "autoDom" }
-    ]
   },
   "settings": {
     "import/resolver": {
