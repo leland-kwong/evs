@@ -12,50 +12,68 @@ const patch = snabbdom.init([
   snabbdomProps,
 ]);
 
+// vnode utils
 const isVnode = (node) =>
   (node
     ? node[vnodeType]
     : false);
+
+const getDomNode = (vnode) => {
+  if (!isVnode(vnode)) {
+    throw new Error(
+      'can only get a dom node from a vnode ref',
+    );
+  }
+
+  return vnode.elm;
+};
 
 const handleProp = {
   // do nothing here because we don't
   // want it reflected to the dom during
   // rendering
   children() {},
-  style(oldStyle = {}, newStyleObj, elm) {
+  style(oldStyle = {}, newStyleObj, ref) {
     Object.keys(newStyleObj).forEach((k) => {
       const nextValue = newStyleObj[k];
       const isSameValue = oldStyle[k] === nextValue;
 
       if (isSameValue) return;
-      setValue(elm.style, k, nextValue);
+      setValue(
+        getDomNode(ref).style, k, nextValue,
+      );
     });
   },
-  class(oldValue, newValue, elm) {
-    setValue(elm, 'className', newValue);
+  class(oldValue, newValue, ref) {
+    setValue(
+      getDomNode(ref), 'className', newValue,
+    );
   },
 
-  onChange(oldValue, newValue, elm) {
-    elm.setAttribute('evs.change', newValue);
+  onChange(oldValue, newValue, ref) {
+    getDomNode(ref)
+      .setAttribute('evs.change', newValue);
   },
-  onInput(oldValue, newValue, elm) {
-    elm.setAttribute('evs.input', newValue);
+  onInput(oldValue, newValue, ref) {
+    getDomNode(ref)
+      .setAttribute('evs.input', newValue);
   },
-  onClick(oldValue, newValue, elm) {
-    elm.setAttribute('evs.click', newValue);
+  onClick(oldValue, newValue, ref) {
+    getDomNode(ref)
+      .setAttribute('evs.click', newValue);
   },
 };
 
 function coerceToVnode(newChildren, value) {
-  if (isVnode(value)) {
-    newChildren.push(value);
-    return newChildren;
-  }
-
   const isFalsy = value === false
     || value === null;
   // ignore falsy values
   if (isFalsy) {
+    return newChildren;
+  }
+
+  if (isVnode(value)) {
+    newChildren.push(value);
     return newChildren;
   }
 
@@ -70,8 +88,9 @@ function Vnode(tagName, props) {
   return {
     sel: tagName,
     props,
-    /**
-     * NOTE: this property is necessary for
+    /*
+     * TODO:
+     * Check if `data` property is necessary for
      * snabbdom to work
      */
     data: {
@@ -99,9 +118,7 @@ const validateValue = (value) => {
   const isInvalidCollection = isArray(value)
     && value.find(invalidCollectionValue);
 
-  if (isFunc(value)
-    || isInvalidCollection
-  ) {
+  if (isInvalidCollection) {
     const stringified = (() => {
       const res = stringifyValueForLogging(value);
       if (res.length > 300) {
@@ -206,16 +223,28 @@ const getVnodeProps = (args, hasArrayValue) => {
     // remove the first argument
     ? args.shift() : {};
   // auto-expand children
+  const { children: childrenFromProps } = props;
   const children = hasArrayValue
     ? args.flat() : args;
+  const combinedChildren = childrenFromProps
+    ? [...childrenFromProps, ...children]
+    : children;
 
+  /**
+   * we can validate/sanitize the props
+   */
   // don't mutate the original
-  return { ...props, children };
+  return { ...props,
+           children: combinedChildren };
 };
 
 const getLispFunc = (lisp) =>
   lisp[0];
 
+/**
+ * Recursively processes a tree of Arrays
+ * as lisp data structures.
+ */
 const processLisp = (value) => {
   const isList = isArray(value);
   /**
@@ -296,4 +325,5 @@ export {
   createElement,
   nativeElements,
   renderToDomNode,
+  getDomNode,
 };
