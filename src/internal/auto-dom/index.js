@@ -66,7 +66,7 @@ const handleProp = {
 
 const validateValue = (value) => {
   if (process.env.NODE_ENV !== 'development') {
-    return null;
+    return value;
   }
 
   const isFuncChild = isFunc(value);
@@ -137,7 +137,7 @@ const validateValue = (value) => {
     `);
   }
 
-  return null;
+  return value;
 };
 
 function textVnode(text) {
