@@ -15,8 +15,9 @@
   "license": "ISC",
   "dependencies": {
     "atomic-state": "github:leland-kwong/atomic-state#v1.0",
+    "hast-util-to-dom": "^2.0.2",
     "is-plain-object": "^3.0.0",
-    "hast-util-to-dom": "^2.0.2"
+    "snabbdom": "^0.7.4"
   },
   "devDependencies": {
     "@babel/core": "^7.8.4",

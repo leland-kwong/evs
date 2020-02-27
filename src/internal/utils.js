@@ -1,1 +1,3 @@
-export function noop() {}
+export const noop = () => {};
+
+export const { isArray } = Array;

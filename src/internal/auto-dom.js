@@ -1,35 +1,40 @@
 import isPlainObject from 'is-plain-object';
 import { outdent } from 'outdent';
-import toDOM from 'hast-util-to-dom';
-import morphdom from 'morphdom';
-import { isFunc } from './is-func';
+import * as snabbdom from 'snabbdom';
+import snabbdomAttributes from 'snabbdom/modules/attributes';
+import snabbdomClass from 'snabbdom/modules/class';
+import snabbdomProps from 'snabbdom/modules/props';
+import snabbdomStyle from 'snabbdom/modules/style';
 import { elementTypes } from './element-types';
+import { isArray } from './utils';
+import { isFunc } from './is-func';
 
-/** automate list of supported events */
-const eventTypes = {
-  onInput: 'evs.input',
-  onClick: 'evs.click',
-};
+const patch = snabbdom.init([
+  snabbdomAttributes,
+  snabbdomClass,
+  snabbdomProps,
+  snabbdomStyle,
+]);
 
-const prepareProps = (obj, children) => {
-  const newO = { children };
-  const keys = Object.keys(obj);
-  let i = 0;
+const isElement = (node) =>
+  (node
+    ? node.isVNode
+    : false);
 
-  while (i < keys.length) {
-    const k = keys[i];
-    const remapped = eventTypes[k];
-    const value = obj[k];
+const mapProps = {
+  class(value, props) {
+    const p = props;
+    p.className = value;
+  },
 
-    if (remapped) {
-      newO[remapped] = value;
-    } else {
-      newO[k] = value;
-    }
-
-    i += 1;
-  }
-  return newO;
+  onInput(value, props, attrs) {
+    const a = attrs;
+    a['evs.input'] = value;
+  },
+  onClick(value, props, attrs) {
+    const a = attrs;
+    a['evs.click'] = value;
+  },
 };
 
 const stringifyValueForLogging = (
@@ -42,8 +47,6 @@ const stringifyValueForLogging = (
     return v;
   });
 
-const toValue = Symbol('@toValue');
-
 /*
  * TODO:
  * Build a custom inspector that maps the lisp structure
@@ -51,22 +54,38 @@ const toValue = Symbol('@toValue');
  * Not sure about the complexity though.
  */
 
-const { isArray } = Array;
+const prepareVNodeData = (obj, children) => {
+  const oProps = { children };
+  const props = {};
+  const attrs = {};
+  const { style } = obj;
+  const keys = Object.keys(obj);
+  let i = 0;
 
-const getSpecialValue = (v) => {
-  const dataFn = v
-    ? v[toValue]
-    : null;
+  while (i < keys.length) {
+    const k = keys[i];
+    const remapper = mapProps[k];
+    const value = obj[k];
 
-  if (dataFn) {
-    return dataFn(v);
+    if (remapper) {
+      remapper(value, props, attrs);
+    } else {
+      props[k] = value;
+    }
+    oProps[k] = value;
+
+    i += 1;
   }
-
-  return v;
+  return {
+    oProps,
+    props,
+    attrs,
+    style,
+  };
 };
 
-function transformToProperType(newChildren, value) {
-  if (value && value.isVNode) {
+function coerceToVnode(newChildren, value) {
+  if (isElement(value)) {
     newChildren.push(value);
     return newChildren;
   }
@@ -78,29 +97,24 @@ function transformToProperType(newChildren, value) {
     return newChildren;
   }
 
-  newChildren.push({ type: 'text', value });
+  // everything else we consider text
+  newChildren.push({
+    text: value,
+  });
   return newChildren;
 }
 
-const isElement = (node) =>
-  (node
-    ? node.type === 'element'
-    : false);
-
-// hast-compatible vnode
-function VNode(tagName, props) {
-  const { children } = props;
-  const p = props;
-
-  // prevent prop from surfacing in dom
-  delete p.children;
+function VNode(tagName, data) {
+  const { oProps, props, attrs, style } = data;
+  const { children } = oProps;
 
   return {
-    type: 'element',
-    tagName,
-    properties: getSpecialValue(props),
+    sel: tagName,
+    // original props
+    props: oProps,
+    data: { attrs, props, style },
     children: children.reduce(
-      transformToProperType,
+      coerceToVnode,
       [],
     ),
     isVNode: true,
@@ -223,18 +237,14 @@ const sliceList = (
 const getVNodeProps = (args) => {
   const firstArg = args[0];
   const hasProps = isPlainObject(firstArg)
-    && !firstArg.tagName;
+    && !isElement(firstArg);
+  const props = hasProps
+    // remove the first argument
+    ? args.shift()
+    : {};
+  const children = args.flat();
 
-  if (hasProps) {
-    const props = args.shift();
-    const children = args.flat();
-
-    return prepareProps(props, children);
-  }
-
-  return {
-    children: args.flat(),
-  };
+  return prepareVNodeData(props, children);
 };
 
 const getLispFunc = (lisp) =>
@@ -245,12 +255,11 @@ const getLispFunc = (lisp) =>
  * [function, ...args]
  */
 const isLispLike = (v) =>
-  v && isFunc(v[0]);
+  isArray(v) && isFunc(v[0]);
 
 const processLisp = (
   value,
 ) => {
-  // console.log(value);
   if (!isLispLike(value)) {
     const isCollection = isArray(value);
 
@@ -266,7 +275,14 @@ const processLisp = (
   // is the lisp function.
   const args = sliceList(value, processLisp, 1);
   const props = getVNodeProps(args);
-  const nextValue = f(props);
+  const nextValue = f.isVNodeFactory
+    ? f(props)
+    /**
+     * vnodes have a different props definition,
+     * so we use the original for functional
+     * components.
+     */
+    : f(props.oProps);
 
   return processLisp(nextValue);
 };
@@ -285,16 +301,24 @@ const processLisp = (
  *  [A.span, 1, 2, 3]]
  * ```
  */
-const defineElement = (tagName) =>
-  (props) =>
+const defineElement = (tagName) => {
+  const elementFactory = (props) =>
     VNode(tagName, props);
+
+  elementFactory.isVNodeFactory = true;
+
+  return elementFactory;
+};
 
 const createElement = processLisp;
 
 const renderToDomNode = (domNode, component) => {
-  const newDom = toDOM(processLisp(component));
+  const d = domNode;
+  const fromNode = d.oldVnode || domNode;
+  const toNode = processLisp(component);
 
-  morphdom(domNode, newDom);
+  patch(fromNode, toNode);
+  d.oldVnode = toNode;
 };
 
 const nativeElements = Object.keys(elementTypes)
@@ -311,6 +335,5 @@ export {
   createElement,
   nativeElements,
   renderToDomNode,
-  toValue,
   isElement,
 };

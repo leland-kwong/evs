@@ -686,10 +686,10 @@ function init() {
     const Group = ({ children }) =>
       children.map((node) => {
         if (isElement(node)) {
-          const { properties: props } = node;
+          const { props } = node;
           return { ...node,
-                   properties: { ...props,
-                                 class: `${props.class || ''} AGroup` } };
+                   props: { ...props,
+                            class: `${props.class || ''} AGroup` } };
         }
         return node;
       });
@@ -720,8 +720,7 @@ function init() {
             [A.h2, 'Perf testing'],
             btnRunBench,
             btnMeasureIteration,
-          ],
-        ]
+          ]]
       );
     };
 

@@ -26,14 +26,21 @@ const numbers = [3, 4, 5];
 const BoldNumbers = () =>
   [BoldNum, { numbers }];
 
-const Greeting = ({ name }) =>
-  [A.h1, 'Hello ', name];
+const Greeting = (props) => {
+  const { name, children } = props;
+  // console.log(props);
+
+  return (
+    [A.h1, 'Hello ', name, children]
+  );
+};
 
 const Hello = ({ name, scope }) =>
   [A.div, { class: 'Hello' },
     [NameInput, { name, scope }],
-    [Greeting, { name }],
-    [BoldNumbers],
+    [Greeting, { name },
+      [BoldNumbers],
+    ],
     [BoldNumbers],
   ];
 
