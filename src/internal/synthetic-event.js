@@ -3,7 +3,7 @@
 /* eslint-disable guard-for-in */
 import { isBrowser } from '../constants';
 import { string } from './string';
-import { isFunc } from './is-func';
+import { isFunc } from './utils';
 
 /**
  * NOTE:

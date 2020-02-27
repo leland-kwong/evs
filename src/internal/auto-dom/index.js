@@ -5,9 +5,9 @@ import snabbdomAttributes from 'snabbdom/modules/attributes';
 import snabbdomClass from 'snabbdom/modules/class';
 import snabbdomProps from 'snabbdom/modules/props';
 import snabbdomStyle from 'snabbdom/modules/style';
-import { elementTypes } from './element-types';
-import { isArray } from './utils';
-import { isFunc } from './is-func';
+import { elementTypes } from '../element-types';
+import { isArray, isFunc,
+  setValue, stringifyValueForLogging } from '../utils';
 
 const patch = snabbdom.init([
   snabbdomAttributes,
@@ -21,13 +21,6 @@ const isElement = (node) =>
     ? node.isVNode
     : false);
 
-const set = (obj, key, value) => {
-  const o = obj;
-
-  o[key] = value;
-  return obj;
-};
-
 const remapProp = {
   // do nothing here because we don't
   // want it reflected to the dom during
@@ -35,33 +28,16 @@ const remapProp = {
   children() {},
 
   class(value, props) {
-    set(props, 'className', value);
+    setValue(props, 'className', value);
   },
 
   onInput(value, props, attrs) {
-    set(attrs, 'evs.input', value);
+    setValue(attrs, 'evs.input', value);
   },
   onClick(value, props, attrs) {
-    set(attrs, 'evs.click', value);
+    setValue(attrs, 'evs.click', value);
   },
 };
-
-const stringifyValueForLogging = (
-  value,
-) =>
-  JSON.stringify(value, (key, v) => {
-    if (isFunc(v)) {
-      return v.toString();
-    }
-    return v;
-  });
-
-/*
- * TODO:
- * Build a custom inspector that maps the lisp structure
- * to the dom? This could be awesome if we can manage it.
- * Not sure about the complexity though.
- */
 
 const prepareVNodeData = (oProps) => {
   const props = {};

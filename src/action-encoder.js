@@ -6,7 +6,7 @@ import {
 } from './constants';
 import { equal } from './internal/equal';
 import { string } from './internal/string';
-import { isFunc } from './internal/is-func';
+import { isFunc } from './internal/utils';
 
 let encoderLengthWarned = false;
 let domEventContext;
