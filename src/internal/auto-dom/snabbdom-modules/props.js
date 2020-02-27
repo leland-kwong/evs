@@ -2,13 +2,24 @@
 /* eslint-disable no-restricted-syntax */
 Object.defineProperty(exports, '__esModule', { value: true });
 
+const emptyObject = Object.freeze({});
+
 function updateProps(oldVnode, vnode) {
-  let key; let cur; const { elm } = vnode; const
-    { props } = vnode.data;
+  let key; const { elm } = vnode;
+  const { props: oldProps = emptyObject } = oldVnode;
+  const { props } = vnode;
+  const { handleProp } = vnode.data;
 
   for (key in props) {
-    cur = props[key];
-    elm[key] = cur;
+    const prev = oldProps[key];
+    const cur = props[key];
+    const customFn = handleProp[key];
+
+    if (customFn) {
+      customFn(prev, cur, elm);
+    } else {
+      elm[key] = cur;
+    }
   }
 }
 
@@ -26,64 +37,64 @@ function updateProps(oldVnode, vnode) {
  * is missing a change handler, that means it should
  * never change.
  */
-function forceFormInputImmutable() {
-  if (immutableFormInputInitialized) return;
+// function forceFormInputImmutable() {
+//   if (immutableFormInputInitialized) return;
 
-  document.addEventListener('input', (ev) => {
-    const { target } = ev;
-    const checkChanges = () => {
-      const inputType = target.getAttribute('type');
+//   document.addEventListener('input', (ev) => {
+//     const { target } = ev;
+//     const checkChanges = () => {
+//       const inputType = target.getAttribute('type');
 
-      switch (inputType) {
-      case 'text': {
-        const attrValue = target.getAttribute('value');
-        const wasChangedExternally = !equal(
-          target.value,
-          attrValue,
-        );
+//       switch (inputType) {
+//       case 'text': {
+//         const attrValue = target.getAttribute('value');
+//         const wasChangedExternally = !equal(
+//           target.value,
+//           attrValue,
+//         );
 
-        if (wasChangedExternally) {
-          if (!hasEvsEvent(target)) {
-            console.warn(outdent`
-              [evs text input]
-              Did we forget to add an \`input\` handler?
-              Evs forces input controls to always be a
-              representation of the render. This is done
-              to make our code easier to reason about.`);
-          }
-          target.value = attrValue;
-        }
-        break;
-      }
-      case 'checkbox': {
-        const attrChecked = equal(
-          target.getAttribute('checked'),
-          '',
-        );
-        const wasChangedExternally = !equal(
-          target.checked,
-          attrChecked,
-        );
+//         if (wasChangedExternally) {
+//           if (!hasEvsEvent(target)) {
+//             console.warn(outdent`
+//               [evs text input]
+//               Did we forget to add an \`input\` handler?
+//               Evs forces input controls to always be a
+//               representation of the render. This is done
+//               to make our code easier to reason about.`);
+//           }
+//           target.value = attrValue;
+//         }
+//         break;
+//       }
+//       case 'checkbox': {
+//         const attrChecked = equal(
+//           target.getAttribute('checked'),
+//           '',
+//         );
+//         const wasChangedExternally = !equal(
+//           target.checked,
+//           attrChecked,
+//         );
 
-        if (wasChangedExternally) {
-          if (!hasEvsEvent(target)) {
-            console.warn(outdent`
-              [evs checkbox]
-              Did we forget to add a \`change\` handler?
-              Evs forces input controls to always be a
-              representation of the render. This is done
-              to make our code easier to reason about.`);
-          }
-          target.checked = attrChecked;
-        }
-        break;
-      }
-      default:
-        break;
-      }
-    };
-  });
-}
+//         if (wasChangedExternally) {
+//           if (!hasEvsEvent(target)) {
+//             console.warn(outdent`
+//               [evs checkbox]
+//               Did we forget to add a \`change\` handler?
+//               Evs forces input controls to always be a
+//               representation of the render. This is done
+//               to make our code easier to reason about.`);
+//           }
+//           target.checked = attrChecked;
+//         }
+//         break;
+//       }
+//       default:
+//         break;
+//       }
+//     };
+//   });
+// }
 
 exports.propsModule = { create: updateProps, update: updateProps };
 exports.default = exports.propsModule;

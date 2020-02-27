@@ -1,9 +1,6 @@
 import isPlainObject from 'is-plain-object';
 import { outdent } from 'outdent';
 import * as snabbdom from 'snabbdom';
-import snabbdomAttributes from 'snabbdom/modules/attributes';
-import snabbdomClass from 'snabbdom/modules/class';
-import snabbdomStyle from 'snabbdom/modules/style';
 import snabbdomProps from './snabbdom-modules/props';
 import { elementTypes } from '../element-types';
 import { isArray, isFunc,
@@ -12,28 +9,7 @@ import { isArray, isFunc,
 const vnodeType = Symbol('@vnode');
 
 const patch = snabbdom.init([
-  snabbdomAttributes,
-  snabbdomClass,
   snabbdomProps,
-  /*
-   * TODO:
-   * We should do all modifications via just
-   * a single props object like react so
-   * we don't have to create 3 different objects
-   * to separate things out. This dramatically
-   * simplifies the api and our code because we
-   * don't have to do conditional checks for
-   * things like if it is a vnode, then don't
-   * include the children, etc...
-   *
-   * TODO:
-   * Style module seems to be way over-optimized
-   * for our use case. Its not reapplying styles
-   * when they don't change for some reason. We
-   * should just move all the styling logic to
-   * the props object.
-   */
-  snabbdomStyle,
 ]);
 
 const isVnode = (node) =>
@@ -41,48 +17,33 @@ const isVnode = (node) =>
     ? node[vnodeType]
     : false);
 
-const remapProp = {
+const handleProp = {
   // do nothing here because we don't
   // want it reflected to the dom during
   // rendering
   children() {},
+  style(oldStyle = {}, newStyleObj, elm) {
+    Object.keys(newStyleObj).forEach((k) => {
+      const nextValue = newStyleObj[k];
+      const isSameValue = oldStyle[k] === nextValue;
 
-  class(value, props) {
-    setValue(props, 'className', value);
+      if (isSameValue) return;
+      setValue(elm.style, k, nextValue);
+    });
+  },
+  class(oldValue, newValue, elm) {
+    setValue(elm, 'className', newValue);
   },
 
-  onChange(value, props, attrs) {
-    setValue(attrs, 'evs.change', value);
+  onChange(oldValue, newValue, elm) {
+    elm.setAttribute('evs.change', newValue);
   },
-  onInput(value, props, attrs) {
-    setValue(attrs, 'evs.input', value);
+  onInput(oldValue, newValue, elm) {
+    elm.setAttribute('evs.input', newValue);
   },
-  onClick(value, props, attrs) {
-    setValue(attrs, 'evs.click', value);
+  onClick(oldValue, newValue, elm) {
+    elm.setAttribute('evs.click', newValue);
   },
-};
-
-const prepareVnodeData = (oProps) => {
-  const props = {};
-  const attrs = {};
-  const { style } = oProps;
-  const keys = Object.keys(oProps);
-  let i = 0;
-
-  while (i < keys.length) {
-    const k = keys[i];
-    const remapper = remapProp[k];
-    const value = oProps[k];
-
-    if (remapper) {
-      remapper(value, props, attrs);
-    } else {
-      props[k] = value;
-    }
-
-    i += 1;
-  }
-  return { props, attrs, style };
 };
 
 function coerceToVnode(newChildren, value) {
@@ -103,15 +64,19 @@ function coerceToVnode(newChildren, value) {
   return newChildren;
 }
 
-function Vnode(tagName, oProps) {
-  const { children } = oProps;
-  const { props, attrs, style } = prepareVnodeData(oProps, children);
+function Vnode(tagName, props) {
+  const { children } = props;
 
   return {
     sel: tagName,
-    // original props
-    props: oProps,
-    data: { attrs, props, style },
+    props,
+    /**
+     * NOTE: this property is necessary for
+     * snabbdom to work
+     */
+    data: {
+      handleProp,
+    },
     children: children.reduce(
       coerceToVnode, [],
     ),
@@ -239,8 +204,7 @@ const getVnodeProps = (args, hasArrayValue) => {
     && !isVnode(firstArg);
   const props = hasProps
     // remove the first argument
-    ? args.shift()
-    : {};
+    ? args.shift() : {};
   // auto-expand children
   const children = hasArrayValue
     ? args.flat() : args;
@@ -303,6 +267,12 @@ const defineElement = (tagName) => {
 
 const createElement = processLisp;
 
+/*
+ * TODO:
+ * If we get an array of vnodes, then we can
+ * automatically wrap them with a parent vnode
+ * with a selector that matches the dom node.
+ */
 const renderToDomNode = (domNode, component) => {
   const d = domNode;
   const fromNode = d.oldVnode || domNode;
@@ -326,5 +296,4 @@ export {
   createElement,
   nativeElements,
   renderToDomNode,
-  isVnode,
 };
