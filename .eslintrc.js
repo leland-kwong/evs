@@ -1,5 +1,3 @@
-const ldomGlobals = require('./src/internal/ldom-globals.json');
-
 module.exports = {
   root: true,
   plugins: [
@@ -70,11 +68,5 @@ module.exports = {
   },
   "env": {
     "jest/globals": true
-  },
-  "overrides": [
-    {
-      files: ['*.ldom.js'],
-      globals: ldomGlobals
-    }
-  ]
+  }
 };

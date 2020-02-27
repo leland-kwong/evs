@@ -1,14 +1,18 @@
 import isPlainObject from 'is-plain-object';
 import { outdent } from 'outdent';
+import toDOM from 'hast-util-to-dom';
+import morphdom from 'morphdom';
 import { isFunc } from './is-func';
+import { elementTypes } from './element-types';
 
+/** automate list of supported events */
 const eventTypes = {
   onInput: 'evs.input',
   onClick: 'evs.click',
 };
 
-const prepareProps = (obj) => {
-  const newO = {};
+const prepareProps = (obj, children) => {
+  const newO = { children };
   const keys = Object.keys(obj);
   let i = 0;
 
@@ -91,8 +95,19 @@ function transformToProperType(newChildren, value) {
   return newChildren;
 }
 
+const isElement = (node) =>
+  (node
+    ? node.type === 'element'
+    : false);
+
 // hast-compatible vnode
-function VNode(tagName, props, children) {
+function VNode(tagName, props) {
+  const { children } = props;
+  const p = props;
+
+  // prevent prop from surfacing in dom
+  delete p.children;
+
   return {
     type: 'element',
     tagName,
@@ -109,6 +124,7 @@ function VNode(tagName, props, children) {
 const identity = (v) =>
   v;
 
+// values should not be nested arrays
 const invalidCollectionValue = (value) =>
   isArray(value);
 
@@ -218,46 +234,22 @@ const sliceList = (
   return args;
 };
 
-const emptyProps = Object.freeze({});
-
 const getVNodeProps = (args) => {
   const firstArg = args[0];
   const hasProps = isPlainObject(firstArg)
     && !firstArg.tagName;
 
   if (hasProps) {
-    const props = prepareProps(args.shift());
-    const children = args;
+    const props = args.shift();
+    const children = args.flat();
 
-    return { props, children };
+    return prepareProps(props, children);
   }
 
   return {
-    props: emptyProps,
-    children: args,
+    children: args.flat(),
   };
 };
-
-/**
- * list component is:
- * [ArrayLike, projectFunction]
- */
-const isListProjection = (value) => {
-  if (!value) {
-    return false;
-  }
-
-  const firstArg = value[0];
-  const isListArg = isArray(firstArg);
-  const hasProjectFn = typeof value[1] === 'function';
-
-  return isListArg
-    && hasProjectFn;
-};
-
-const isDeepCollection = (value) =>
-  isArray(value)
-  && value.find(isArray);
 
 const getLispFunc = (lisp) =>
   lisp[0];
@@ -272,16 +264,12 @@ const isLispLike = (v) =>
 const processLisp = (
   value,
 ) => {
+  // console.log(value);
   if (!isLispLike(value)) {
-    if (isListProjection(value)) {
-      const [items, project] = value;
+    const isCollection = isArray(value);
 
-      return items.map((v) =>
-        processLisp(project(v)));
-    }
-
-    if (isDeepCollection(value)) {
-      return value.flat(1);
+    if (isCollection) {
+      return value.map(processLisp);
     }
 
     return value;
@@ -291,37 +279,52 @@ const processLisp = (
   // ignore first value since it
   // is the lisp function.
   const args = sliceList(value, processLisp, 1);
-  const { props, children } = getVNodeProps(args);
-  const nextValue = f(props, children);
+  const props = getVNodeProps(args);
+  const nextValue = f(props);
 
   return processLisp(nextValue);
 };
 
-const tagCache = new Map();
+/**
+ * Generates a convenience method for element factories
+ * so we can do something like:
+ *
+ * const A = {
+ *  div: defineElement('div'),
+ *  span: defineElement('span'),
+ * }
+ *
+ * ```js
+ * [A.div,
+ *  [A.span, 1, 2, 3]]
+ * ```
+ */
+const defineElement = (tagName) =>
+  (props) =>
+    VNode(tagName, props);
 
-export const autoDom = new Proxy({}, {
-  /**
-   * auto-generates a element vnode function
-   * based on the tag name.
-   */
-  get(source, tagName) {
-    const fromCache = tagCache.get(tagName);
+const createElement = processLisp;
 
-    if (fromCache) return fromCache;
+const renderToDomNode = (domNode, component) => {
+  const newDom = toDOM(processLisp(component));
 
-    const newElement = (props, children) =>
-      VNode(tagName, props, children);
+  morphdom(domNode, newDom);
+};
 
-    tagCache.set(tagName, newElement);
+const nativeElements = Object.keys(elementTypes)
+  .reduce((elementFactories, tagName) => {
+    const e = elementFactories;
 
-    return newElement;
-  },
-});
+    e[tagName] = defineElement(tagName);
 
-function createElement(templateFn, arg) {
-  return processLisp(
-    templateFn(arg),
-  );
-}
+    return e;
+  }, {});
 
-export { createElement, toValue };
+export {
+  defineElement,
+  createElement,
+  nativeElements,
+  renderToDomNode,
+  toValue,
+  isElement,
+};

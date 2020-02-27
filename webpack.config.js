@@ -16,14 +16,6 @@ module.exports = {
     hot: true,
   },
   plugins: [
-    new webpack.DefinePlugin({
-      ...Object.keys(htmlGlobals).reduce((defs, key) => {
-        const d = defs;
-
-        d[key] = `autoDom.${key}`;
-        return d;
-      }, {}),
-    }),
     new CleanWebpackPlugin(),
     new HtmlWebpackPlugin({
       title: 'Hot Module Replacement',

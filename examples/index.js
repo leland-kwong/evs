@@ -1,7 +1,6 @@
 /* global document, performance, window */
 import morphdom from 'morphdom';
 import * as atomicState from 'atomic-state/lib';
-import toDOM from 'hast-util-to-dom';
 import * as evs from '../src/index';
 import {
   isEvsComponent,
@@ -10,7 +9,13 @@ import {
 } from '../src/internal/web-component';
 import { isBrowser } from '../src/constants';
 import { equal } from '../src/internal/equal';
-import { Hello, createElement, autoDom } from './prototype.ldom';
+import {
+  Hello,
+  renderToDomNode,
+  nativeElements,
+  createElement,
+  isElement,
+} from './prototype.ldom';
 
 if (isBrowser) {
   watchComponentsAdded(document.body);
@@ -610,12 +615,19 @@ function init() {
   const scope = evs.createScope('@vdomTest');
 
   const BenchCreateElement = ({ size = 1000, numTests = 5 }) => {
+    console.log(
+      createElement(
+        [Hello, { name: 'foo',
+                  scope }],
+      ),
+    );
     const range = Array(size).fill(0);
     const test = () => {
       range.forEach(() => {
-        createElement(Hello, {
-          name: 'foo', scope,
-        });
+        createElement(
+          [Hello, { name: 'foo',
+                    scope }],
+        );
       });
     };
 
@@ -627,8 +639,27 @@ function init() {
     );
   };
 
+  const MeasureIteration = ({ size = 1000, numTests = 5 }) => {
+    /*
+     * Benchmarking different iteration algorithms just to see
+     * the average cost of it and decide whether we need to
+     * optimize or not.
+     */
+    const range = Array(size).fill(0);
+    const items = Array(10).fill(0);
+    console.log(
+      benchFn(() => {
+        range.forEach(() => {
+          items.map((v) =>
+            [v + 1, v + 2]);
+        });
+      }, null, numTests),
+    );
+  };
+
   const effects = {
     BenchCreateElement,
+    MeasureIteration,
   };
 
   const onEvent = (action, context) => {
@@ -651,35 +682,59 @@ function init() {
       ...options,
     });
 
-  const render = (data) => {
-    const A = autoDom;
+  const RunMeasureIteration = () =>
+    ({
+      type: 'MeasureIteration',
+    });
 
-    const TestUi = () => {
+  const render = (data) => {
+    const A = nativeElements;
+    const Group = ({ children }) =>
+      children.map((node) => {
+        if (isElement(node)) {
+          const { properties: props } = node;
+          return { ...node,
+                   properties: { ...props,
+                                 class: `${props.class || ''} AGroup` } };
+        }
+        return node;
+      });
+
+    const PerfTests = () => {
       const runBench = scope.call(
         RunBench,
         { size: 200, numTests: 5 },
       );
 
+      const measureIteration = scope.call(
+        RunMeasureIteration,
+      );
+
       return (
-        [A.div,
-          [A.button,
-            { onClick: runBench,
-              class: 'foobar' },
-            'run bench']]
+        [Group,
+          [A.div,
+            [A.h2, 'Perf testing'],
+            [A.button,
+              { onClick: runBench },
+              'create vnodes',
+            ],
+            [A.button,
+              { onClick: measureIteration,
+                autofocus: true },
+              'measure iteration',
+            ],
+          ],
+        ]
       );
     };
 
-    const view = () =>
-      (
-        [A.div,
-          [TestUi],
-          [Hello, { name: data.name,
-                    scope }]]
-      );
-    const toDom = toDOM(
-      createElement(view),
-    );
-    morphdom(rootDom, toDom);
+    const View = () =>
+      [A.div,
+        [PerfTests],
+        [Hello, { name: data.name,
+                  scope }]];
+
+    renderToDomNode(rootDom, [View]);
   };
 
   const rootReducer = (state, action) => {
