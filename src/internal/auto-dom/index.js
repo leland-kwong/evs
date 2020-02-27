@@ -220,6 +220,7 @@ const getVNodeProps = (args) => {
     // remove the first argument
     ? args.shift()
     : {};
+  // auto-expand children
   const children = args.flat();
 
   // don't mutate the original
