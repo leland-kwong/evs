@@ -64,59 +64,40 @@ const handleProp = {
   },
 };
 
-function coerceToVnode(newChildren, value) {
-  const isFalsy = value === false
-    || value === null;
-  // ignore falsy values
-  if (isFalsy) {
-    return newChildren;
-  }
-
-  if (isVnode(value)) {
-    newChildren.push(value);
-    return newChildren;
-  }
-
-  // everything else we consider text
-  newChildren.push({ text: value });
-  return newChildren;
-}
-
-function Vnode(tagName, props) {
-  const { children } = props;
-
-  return {
-    sel: tagName,
-    props,
-    /*
-     * TODO:
-     * Check if `data` property is necessary for
-     * snabbdom to work
-     */
-    data: {
-      handleProp,
-    },
-    children: children.reduce(
-      coerceToVnode, [],
-    ),
-    [vnodeType]: true,
-  };
-}
-
-const identity = (v) =>
-  v;
-
-// values should not be nested arrays
-const invalidCollectionValue = (value) =>
-  isArray(value);
-
 const validateValue = (value) => {
   if (process.env.NODE_ENV !== 'development') {
-    return value;
+    return null;
+  }
+
+  const isFuncChild = isFunc(value);
+
+  if (isFuncChild) {
+    const stringified = stringifyValueForLogging(value);
+    throw new Error(outdent`
+      Sorry, functions are not valid as a child.
+
+      Received:
+      ${stringified}
+
+    `);
+  }
+
+  const isObjectChild = typeof value === 'object';
+
+  if (isObjectChild) {
+    const stringified = stringifyValueForLogging(value);
+    throw new Error(outdent`
+      Sorry, objects are not valid as a child.
+
+      Received:
+      ${stringified}
+
+    `);
   }
 
   const isInvalidCollection = isArray(value)
-    && value.find(invalidCollectionValue);
+    // children should not be nested arrays
+    && value.find(isArray);
 
   if (isInvalidCollection) {
     const stringified = (() => {
@@ -127,7 +108,7 @@ const validateValue = (value) => {
       return res;
     })();
 
-    console.warn(outdent`
+    throw new Error(outdent`
       Sorry,
 
       ${stringified}
@@ -154,39 +135,67 @@ const validateValue = (value) => {
 
       \`\`\`
     `);
-
-    const styles = {
-      container: `
-        background: #3c3601;
-        color: #ffff4a;
-        padding: .5rem;
-        font-size: 14px;
-        font-weight: normal;
-        font-family: monospace`,
-      helpText: `
-        font-weight: bold`,
-    };
-
-    return Vnode(
-      'div',
-      { style: styles.container },
-      [
-        Vnode(
-          'div',
-          { style: styles.helpText },
-          ['invalid component detected:'],
-        ),
-        Vnode(
-          'pre',
-          {},
-          [stringified],
-        ),
-      ],
-    );
   }
 
-  return value;
+  return null;
 };
+
+function textVnode(text) {
+  return {
+    text,
+    [vnodeType]: true,
+  };
+}
+
+const falsyValues = new Set([
+  false,
+  null,
+  undefined,
+]);
+
+function coerceToVnode(newChildren, value) {
+  // ignore falsy values
+  if (falsyValues.has(value)) {
+    return newChildren;
+  }
+
+  if (isVnode(value)) {
+    newChildren.push(value);
+    return newChildren;
+  }
+
+  // everything else we consider text
+  newChildren.push(
+    textVnode(
+      validateValue(value),
+    ),
+  );
+  return newChildren;
+}
+
+const Vnode = (tagName, props) => {
+  const { children } = props;
+
+  return {
+    sel: tagName,
+    props,
+    /*
+     * TODO:
+     * Check if `data` property is necessary for
+     * snabbdom to work
+     */
+    data: {
+      handleProp,
+    },
+    children: children.reduce(
+      coerceToVnode, [],
+    ),
+    [vnodeType]: true,
+  };
+};
+
+const identity = (v) =>
+  v;
 
 const sliceList = (
   lisp = [],
@@ -202,9 +211,7 @@ const sliceList = (
 
   while (i < endAt) {
     const arg = lisp[i];
-    const value = validateValue(
-      callback(arg),
-    );
+    const value = callback(arg);
     const currentIndex = i - startFrom;
 
     hasArrayValue = hasArrayValue || isArray(value);
@@ -222,9 +229,9 @@ const getVnodeProps = (args, hasArrayValue) => {
   const props = hasProps
     // remove the first argument
     ? args.shift() : {};
-  // auto-expand children
   const { children: childrenFromProps } = props;
   const children = hasArrayValue
+    // auto-expand children
     ? args.flat() : args;
   const combinedChildren = childrenFromProps
     ? [...childrenFromProps, ...children]
