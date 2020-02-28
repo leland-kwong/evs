@@ -16,9 +16,11 @@ const NameInput = ({ name, scope }) =>
     'Name: ',
     [A.input,
       { value: name,
-        onInput: (event) =>
+        onInput: (event) => {
+          const newName = evs.InputValue(event);
           evs.notify(scope,
-            SetName(evs.InputValue(event))) }]];
+            SetName(newName));
+        } }]];
 
 const BoldNum = ({ numbers }) =>
   numbers.map((num) =>
@@ -79,25 +81,29 @@ const SmartComponentRenderer = (innerProps) => {
   const { text } = props;
   const { count } = atomicState.read(model);
 
-  const smartText = (
+  const Title = ({ children }) =>
+    [A.h3,
+      { style: { textTransform: 'capitalize' } },
+      children];
+
+  const textFromProps = (
     [A.div,
-      'text: ',
+      [Title, 'from props'],
       [A.strong, text]]);
 
-  const counter = (
+  const counterFromModel = (
     [A.div,
+      [Title, 'from model'],
       [A.div,
-        'count: ',
-        [A.strong, count],
-      ],
+        'count: ', [A.strong, count]],
       [A.button,
         { onClick: increment },
         'increment']]);
 
   return (
     [A.div, innerProps,
-      smartText,
-      counter]);
+      textFromProps,
+      counterFromModel]);
 };
 
 const model = atomicState.atom({ count: 0 });
@@ -110,7 +116,8 @@ const SmartComponentExample = (props) =>
 
 const Hello = ({ name, scope }) =>
   [A.div,
-    [SmartComponentExample, { text: `Smart one ${name}` }],
+    [SmartComponentExample,
+      { text: `Smart one ${name}` }],
     [NameInput, { name, scope }],
     [Greeting, { name }],
     [BoldNumbers],
