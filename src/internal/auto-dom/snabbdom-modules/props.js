@@ -31,6 +31,13 @@ function updateProps(hook, oldVnode, vnode) {
 }
 
 exports.propsModule = {
+  /*
+   * TODO:
+   * When creating an form input dom node, we should
+   * validate that it at least has a value/checked
+   * property to make sure the state of the control
+   * is always a representation of the the render.
+   */
   create: (oldVnode, vnode) => {
     updateProps(hookType.create, oldVnode, vnode);
   },
