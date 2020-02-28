@@ -40,13 +40,14 @@ const handleProp = {
   children() {},
 
   style(oldStyle = {}, newStyleObj, ref) {
+    const domNode = getDomNode(ref);
     Object.keys(newStyleObj).forEach((k) => {
       const nextValue = newStyleObj[k];
       const isSameValue = oldStyle[k] === nextValue;
 
       if (isSameValue) return;
       setValue(
-        getDomNode(ref).style, k, nextValue,
+        domNode.style, k, nextValue,
       );
     });
   },
