@@ -13,6 +13,7 @@ function updateProps(hook, oldVnode, vnode) {
   const { handleProp } = vnode.data;
   const hookFn = props[hook];
 
+  // lifecycle hooks like onCreate, onUpdate, etc...
   if (hookFn) {
     hookFn(vnode);
   }
@@ -20,7 +21,15 @@ function updateProps(hook, oldVnode, vnode) {
   for (key in props) {
     const prev = oldProps[key];
     const cur = props[key];
-    const customFn = handleProp[key];
+    const customFn = handleProp[key]
+      /*
+       * Mostly for event handlers. We can
+       * safely assume that case sensitive prop
+       * names don't matter. It wouldn't make sense
+       * to have both an `onClick` and an `onclick`
+       * handler at the same time.
+       */
+      || handleProp[key.toLowerCase()];
 
     if (customFn) {
       customFn(prev, cur, vnode);

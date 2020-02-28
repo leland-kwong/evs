@@ -3,6 +3,7 @@ import { outdent } from 'outdent';
 import * as snabbdom from 'snabbdom';
 import snabbdomProps from './snabbdom-modules/props';
 import { elementTypes } from '../element-types';
+import { getSupportedEventTypes } from '../../get-event-types';
 import { isArray, isFunc,
   setValue, stringifyValueForLogging } from '../utils';
 
@@ -29,10 +30,10 @@ const getDomNode = (vnode) => {
 };
 
 const handleProp = {
-  // do nothing here because we don't
-  // want it reflected to the dom during
-  // rendering
+  // do nothing here because we want to
+  // exclude it from being applied to the dom
   children() {},
+
   style(oldStyle = {}, newStyleObj, ref) {
     Object.keys(newStyleObj).forEach((k) => {
       const nextValue = newStyleObj[k];
@@ -44,21 +45,27 @@ const handleProp = {
       );
     });
   },
+
   class(oldValue, newValue, ref) {
     setValue(
       getDomNode(ref), 'className', newValue,
     );
   },
 
-  onChange(oldValue, newValue, ref) {
-    getDomNode(ref).onchange = newValue;
-  },
-  onInput(oldValue, newValue, ref) {
-    getDomNode(ref).oninput = newValue;
-  },
-  onClick(oldValue, newValue, ref) {
-    getDomNode(ref).onclick = newValue;
-  },
+  // setup builtin dom event types
+  ...getSupportedEventTypes().reduce((handlerCallbacks, eventName) => {
+    const h = handlerCallbacks;
+    const domEventPropName = `on${eventName}`;
+
+    h[domEventPropName] = (
+      oldValue, newValue, ref,
+    ) => {
+      getDomNode(ref)[
+        domEventPropName] = newValue;
+    };
+
+    return handlerCallbacks;
+  }, {}),
 };
 
 const validateValue = (value) => {
