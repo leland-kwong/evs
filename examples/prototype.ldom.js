@@ -1,5 +1,8 @@
+import * as atomicState from 'atomic-state';
 import * as evs from '../src';
-import { nativeElements as A } from '../src/internal/auto-dom';
+import { nativeElements as A,
+  getDomNode,
+  renderToDomNode } from '../src/internal/auto-dom';
 
 function SetName(name) {
   return {
@@ -11,11 +14,11 @@ function SetName(name) {
 const NameInput = ({ name, scope }) =>
   [A.label,
     'Name: ',
-    [A.input, { value: name,
-                onInput: scope.call(
-                  SetName,
-                  evs.InputValue,
-                ) }]];
+    [A.input,
+      { value: name,
+        onInput: (event) =>
+          evs.notify(scope,
+            SetName(evs.InputValue(event))) }]];
 
 const BoldNum = ({ numbers }) =>
   numbers.map((num) =>
@@ -35,12 +38,81 @@ const Greeting = (props) => {
   );
 };
 
+const WithModel = ({
+  model,
+  // mapData = (v) =>
+  //   v,
+  render,
+  props,
+}) => {
+  const onUpdate = (ref) => {
+    const renderComponent = () => {
+      renderToDomNode(
+        getDomNode(ref),
+        [render,
+          { props,
+            model,
+            render }],
+      );
+    };
+
+    atomicState.addWatch(model, ref, renderComponent);
+    renderComponent();
+  };
+
+  return (
+    // TODO: add support for rendering a comment node to start with
+    [A.div,
+      { onCreate: onUpdate,
+        onUpdate }]
+  );
+};
+
+const SmartComponentRenderer = (innerProps) => {
+  const { props, model } = innerProps;
+
+  const increment = () => {
+    atomicState.swap(model, ({ count }) =>
+      ({ count: count + 1 }));
+  };
+
+  const { text } = props;
+  const { count } = atomicState.read(model);
+
+  const smartText = (
+    [A.div,
+      'text: ',
+      [A.strong, text]]);
+
+  const counter = (
+    [A.div,
+      [A.div,
+        'count: ',
+        [A.strong, count],
+      ],
+      [A.button,
+        { onClick: increment },
+        'increment']]);
+
+  return (
+    [A.div, innerProps,
+      smartText,
+      counter]);
+};
+
+const model = atomicState.atom({ count: 0 });
+
+const SmartComponentExample = (props) =>
+  ([WithModel,
+    { props,
+      model,
+      render: SmartComponentRenderer }]);
+
 const Hello = ({ name, scope }) =>
-  [A.div, { class: 'Hello' },
+  [A.div,
+    [SmartComponentExample, { text: `Smart one ${name}` }],
     [NameInput, { name, scope }],
-    [Greeting, { name },
-      [BoldNumbers],
-    ],
+    [Greeting, { name }],
     [BoldNumbers],
   ];
 
