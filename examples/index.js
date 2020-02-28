@@ -1,21 +1,12 @@
-/* global document, performance, window */
+/* global document, performance */
 import * as atomicState from 'atomic-state/lib';
 import * as evs from '../src/index';
-import {
-  watchComponentsAdded,
-} from '../src/internal/web-component';
-import { isBrowser } from '../src/constants';
 import {
   Hello,
   renderToDomNode,
   nativeElements,
   createElement,
-  isElement,
 } from './prototype.ldom';
-
-if (isBrowser) {
-  watchComponentsAdded(document.body);
-}
 
 const makeTodoId = () =>
   Math.random().toString(32).slice(2);
@@ -142,132 +133,6 @@ function benchFn(
       a + b) / results.length,
   };
 }
-window.benchFn = benchFn;
-
-const SetNewTodoText = (text) =>
-  ({
-    type: 'SetNewTodoText',
-    text,
-  });
-
-const AddTodo = () =>
-  ({
-    type: 'AddTodo',
-  });
-
-const RunActionPerf = () =>
-  ({
-    type: 'RunActionPerf',
-  });
-
-const SetActionPerfCount = (count) =>
-  ({
-    type: 'SetActionPerfCount',
-    count,
-  });
-
-const TodoSetText = ({ id, text }) =>
-  ({
-    type: 'EditTodo',
-    changes: {
-      text,
-    },
-    id,
-  });
-
-const TodoSetDone = ({ id, done }) =>
-  ({
-    type: 'EditTodo',
-    changes: {
-      done,
-    },
-    id,
-  });
-
-const TestComponent = (props, ns) => {
-  const {
-    children = '',
-    $root,
-  } = props;
-  const stateRef = evs.getDataSource(ns);
-  const state = atomicState.read(stateRef);
-
-  /**
-   * Since we can watch with a key, its just overwrites
-   * the previous watcher after each render. This allows
-   * us to watch the state and rerender automatically
-   * when it changes.
-   */
-  atomicState.addWatch(stateRef, $root, () => {
-    evs.notify(
-      evScope,
-      TestComponent(props, ns),
-    );
-  });
-
-  return {
-    type: 'ComponentRender',
-    rootNode: $root,
-    attributes: {
-      style: `
-        border: 1px solid #000;
-        padding: 1rem;
-      `,
-    },
-    render: html`
-      <h2>My Custom Component</h2>
-      ${children}
-    `,
-  };
-};
-
-const NullComponent = ({ $root }) =>
-  ({
-    type: 'ComponentRender',
-    rootNode: $root,
-    render: NullRender,
-  });
-
-const ToggleLogAction = (enabled) =>
-  ({
-    type: 'EnableLogAction',
-    enabled: !enabled,
-  });
-
-
-const sideEffects = {
-  RunActionPerf(state) {
-    const { actionPerf } = state;
-    const iterRange = new Array(400).fill(0);
-    const listOfStrings = new Array(50).fill(0).map(() =>
-      Math.random().toString(16).slice(0, 10)).join('');
-    // console.log(listOfStrings.length);
-    const actionHandler = (text) =>
-      ({
-        type: 'setNewTodoText',
-        text,
-      });
-    const scope = evs.createScope('testBench');
-    // console.log(listOfStrings.join('').length);
-    function actionCreationPerf(
-    ) {
-      iterRange.forEach(() => {
-        scope.call(
-          actionHandler,
-          listOfStrings,
-        );
-      });
-    }
-    const results = benchFn(
-      actionCreationPerf,
-      null,
-      actionPerf.count,
-    );
-    console.log(results);
-  },
-};
-
-// init();
 
 (() => {
   const rootDom = document.createElement('div');
@@ -289,7 +154,7 @@ const sideEffects = {
       });
     };
 
-    // const vNode = createElement(Hello, { name: 'foo', scope });
+    // const vNode = createElement([Hello, { name: 'foo', scope }]);
     // console.log(vNode);
 
     console.log(
@@ -321,9 +186,9 @@ const sideEffects = {
   };
 
   const onEvent = (action, context) => {
-    const { render, dataSource, rootReducer } = context;
+    const { render, model, rootReducer } = context;
     const nextState = swap(
-      dataSource, rootReducer, action,
+      model, rootReducer, action,
     );
     if (nextState.logAction) {
       console.log(`[${scope.namespace}]`, action, nextState);
@@ -353,31 +218,39 @@ const sideEffects = {
       enabled,
     });
 
-  const dataSource = atom({
+  const model = atom({
     name: 'Leland',
     logAction: false,
   });
 
-  const DevDashboard = ({ logAction }) =>
-    [A.form,
-      [A.label,
-        [A.input, { type: 'checkbox',
-                    class: 'dev-checkbox',
-                    checked: logAction,
-                    onChange: scope.call(
-                      ToggleLogger,
-                      evs.InputChecked,
-                    ) },
-        ], 'log action',
-      ],
-    ];
+  const DevDashboard = ({ logAction = false }) => {
+    const toggler = (
+      [A.input,
+        { type: 'checkbox',
+          class: 'dev-checkbox',
+          checked: logAction,
+          onChange: (event) =>
+            evs.notify(
+              scope,
+              ToggleLogger(
+                evs.InputChecked(event),
+              ),
+            ) }]
+    );
+
+    return (
+      [A.form,
+        [A.label,
+          toggler, ' ', 'log action']]);
+  };
 
   const render = (data) => {
     const PerfTests = () => {
-      const runBench = scope.call(
-        RunBench,
-        { size: 200, numTests: 5 },
-      );
+      const runBench = () =>
+        evs.notify(
+          scope,
+          RunBench({ size: 200, numTests: 5 }),
+        );
       const btnRunBench = (
         [A.button,
           { onClick: runBench },
@@ -404,6 +277,9 @@ const sideEffects = {
 
     const View = () =>
       [A.div,
+        { style: {
+          fontFamily: 'sans-serif',
+        } },
         [DevDashboard, data],
         [PerfTests],
         [Hello, { name: data.name,
@@ -435,7 +311,7 @@ const sideEffects = {
   };
 
   evs.subscribe(scope, onEvent,
-    { render, rootReducer, dataSource });
+    { render, rootReducer, model });
 
   evs.notify(scope, {
     type: '@VdomTestInit',
