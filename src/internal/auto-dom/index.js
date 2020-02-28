@@ -217,12 +217,12 @@ const Vnode = (tagName, props) => {
 const identity = (v) =>
   v;
 
-const sliceList = (
+const prepareArgs = (
   lisp = [],
   callback = identity,
-  startFrom = 0,
-  endAt = lisp.length,
 ) => {
+  const startFrom = 1;
+  const endAt = lisp.length;
   const { length } = lisp;
   let hasArrayValue = false;
   let i = startFrom;
@@ -242,7 +242,7 @@ const sliceList = (
   return [args, hasArrayValue];
 };
 
-const getVnodeProps = (args, hasArrayValue) => {
+const parseProps = (args, hasArrayValue) => {
   const firstArg = args[0];
   const hasProps = isPlainObject(firstArg)
     && !isVnode(firstArg);
@@ -291,8 +291,8 @@ const processLisp = (value) => {
 
   const f = getLispFunc(value);
   // everything after the first value
-  const [args, hasArrayValue] = sliceList(value, processLisp, 1);
-  const props = getVnodeProps(args, hasArrayValue);
+  const [args, hasArrayValue] = prepareArgs(value, processLisp);
+  const props = parseProps(args, hasArrayValue);
   const nextValue = f(props);
 
   return processLisp(nextValue);
