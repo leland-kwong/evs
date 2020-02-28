@@ -51,16 +51,13 @@ const handleProp = {
   },
 
   onChange(oldValue, newValue, ref) {
-    getDomNode(ref)
-      .setAttribute('evs.change', newValue);
+    getDomNode(ref).onchange = newValue;
   },
   onInput(oldValue, newValue, ref) {
-    getDomNode(ref)
-      .setAttribute('evs.input', newValue);
+    getDomNode(ref).oninput = newValue;
   },
   onClick(oldValue, newValue, ref) {
-    getDomNode(ref)
-      .setAttribute('evs.click', newValue);
+    getDomNode(ref).onclick = newValue;
   },
 };
 
