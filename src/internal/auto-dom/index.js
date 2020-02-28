@@ -29,6 +29,11 @@ const getDomNode = (vnode) => {
   return vnode.elm;
 };
 
+const remappedEventTypes = {
+  focusin: 'focus',
+  focusout: 'blur',
+};
+
 const handleProp = {
   // do nothing here because we want to
   // exclude it from being applied to the dom
@@ -52,10 +57,21 @@ const handleProp = {
     );
   },
 
+  /*
+   * TODO:
+   * We should probably setup the synthetic event system
+   * so we can do more advance event handling that the
+   * traditional system can't do for us.
+   */
   // setup builtin dom event types
-  ...getSupportedEventTypes().reduce((handlerCallbacks, eventName) => {
+  ...[
+    ...getSupportedEventTypes(),
+    'focusin',
+    'focusout',
+  ].reduce((handlerCallbacks, eventName) => {
     const h = handlerCallbacks;
-    const domEventPropName = `on${eventName}`;
+    const remappedName = remappedEventTypes[eventName];
+    const domEventPropName = `on${remappedName || eventName}`;
 
     h[domEventPropName] = (
       oldValue, newValue, ref,
@@ -309,9 +325,8 @@ const createElement = processLisp;
 
 /*
  * TODO:
- * If we get an array of vnodes, then we can
- * automatically wrap them with a parent vnode
- * with a selector that matches the dom node.
+ * Add support for rendering an array of vnodes
+ * so we don't require a single parent vnode.
  */
 const renderToDomNode = (domNode, component) => {
   const d = domNode;
