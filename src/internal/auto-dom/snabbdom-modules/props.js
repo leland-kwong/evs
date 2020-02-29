@@ -3,11 +3,16 @@
 Object.defineProperty(exports, '__esModule', { value: true });
 
 const hookType = require('./hook-type');
-const { call } = require('../../utils');
+const { call, isFunc } = require('../../utils');
 
 const emptyObject = Object.freeze({});
 
 const execHook = (vnode, hookConfig) => {
+  if (isFunc(hookConfig)) {
+    hookConfig(vnode);
+    return;
+  }
+
   const [hookFn, hookArg] = hookConfig || [];
   call([hookFn, vnode, hookArg]);
 };
@@ -42,7 +47,7 @@ function updateProps(hook, oldVnode, vnode) {
 }
 
 function onDestroy(hook, oldVnode) {
-  const { props } = oldVnode;
+  const { props = {} } = oldVnode;
 
   execHook(oldVnode, props[hook]);
 }

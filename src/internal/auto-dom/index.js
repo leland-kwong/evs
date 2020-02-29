@@ -20,22 +20,15 @@ const isVnode = (node) =>
     ? node[vnodeType]
     : false);
 
-const getDomNode = (vnode) => {
-  if (!isVnode(vnode)) {
-    throw new Error(
-      'can only get a dom node from a vnode ref',
-    );
-  }
-
-  return vnode.elm;
-};
+const getDomNode = (vnode) =>
+  vnode.elm;
 
 const remappedEventTypes = {
   focusin: 'focus',
   focusout: 'blur',
 };
 
-const handleProp = {
+const handleProp = Object.freeze({
   // do nothing here because we want to
   // exclude it from being applied to the dom
   children() {},
@@ -84,13 +77,9 @@ const handleProp = {
 
     return handlerCallbacks;
   }, {}),
-};
+});
 
 const validateValue = (value) => {
-  if (process.env.NODE_ENV !== 'development') {
-    return value;
-  }
-
   const isFuncChild = isFunc(value);
 
   if (isFuncChild) {
@@ -119,9 +108,8 @@ const validateValue = (value) => {
     `);
   }
 
-  const isInvalidCollection = isArray(value)
-    // children should not be nested arrays
-    && value.find(isArray);
+  // children should not be nested arrays
+  const isInvalidCollection = isArray(value);
 
   if (isInvalidCollection
       && process.env.NODE_ENV === 'development'
@@ -160,15 +148,14 @@ function coerceToVnode(newChildren, value) {
 
   // everything else we consider text
   newChildren.push(
-    textVnode(
-      validateValue(value),
-    ),
+    textVnode(value),
   );
   return newChildren;
 }
 
+/* rename this to createVnode or something more idiomatic */
 const Vnode = (tagName, props) => {
-  const { children } = props;
+  const { children = [] } = props;
 
   return {
     sel: tagName,
@@ -188,6 +175,24 @@ const Vnode = (tagName, props) => {
   };
 };
 
+/**
+ * Clone and return a new vnode. New children will
+ * replace existing children.
+ */
+const cloneElement = (vnode, props, children) => {
+  const { sel } = vnode;
+  /*
+   * TODO:
+   * Need to figure out an idiomatic way to also
+   * combine the hooks
+   */
+  const newProps = { ...vnode.props,
+                     ...props,
+                     children };
+
+  return Vnode(sel, newProps);
+};
+
 const identity = (v) =>
   v;
 
@@ -195,6 +200,7 @@ const prepareArgs = (
   lisp = [],
   callback = identity,
 ) => {
+  // console.log(lisp);
   const startFrom = 1;
   const endAt = lisp.length;
   const { length } = lisp;
@@ -230,6 +236,11 @@ const parseProps = (args, hasArrayValue) => {
   const combinedChildren = childrenFromProps
     ? [...childrenFromProps, ...children]
     : children;
+
+  if (process.env.NODE_ENV === 'development') {
+    combinedChildren
+      .forEach(validateValue);
+  }
 
   /**
    * we can validate/sanitize the props
@@ -272,6 +283,8 @@ const processLisp = (value) => {
   return processLisp(nextValue);
 };
 
+const createElement = processLisp;
+
 /**
  * Generates a convenience method for element factories
  * so we can do something like:
@@ -310,10 +323,10 @@ const defineElement = (tagName) => {
 const renderToDomNode = (domNode, component) => {
   const d = domNode;
   const fromNode = d.oldVnode || domNode;
-  const toNode = processLisp(component);
+  const toNode = createElement(component);
 
-  patch(fromNode, toNode);
   d.oldVnode = toNode;
+  patch(fromNode, toNode);
 };
 
 const nativeElements = Object.keys(elementTypes)
@@ -325,9 +338,14 @@ const nativeElements = Object.keys(elementTypes)
     return e;
   }, {});
 
+// this is how you create a comment in snabbdom
+nativeElements.comment = defineElement('!');
+
 export {
   defineElement,
   nativeElements,
   renderToDomNode,
   getDomNode,
+  createElement,
+  cloneElement,
 };
