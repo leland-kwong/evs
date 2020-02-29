@@ -5,6 +5,7 @@ import {
   Hello,
   renderToDomNode,
   nativeElements,
+  createElement,
 } from './prototype.ldom';
 
 const makeTodoId = () =>
@@ -153,8 +154,8 @@ function benchFn(
       });
     };
 
-    // const vNode = createElement([Hello, { name: 'foo', scope }]);
-    // console.log(vNode);
+    const vNode = createElement([Hello, { name: 'foo', scope }]);
+    console.log(vNode);
 
     console.log(
       benchFn(test, null, numTests),

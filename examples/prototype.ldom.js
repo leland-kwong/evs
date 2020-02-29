@@ -1,9 +1,10 @@
 import * as atomicState from 'atomic-state';
-import { css } from 'emotion';
 import * as evs from '../src';
 import * as styles from './styles';
 import { nativeElements as A,
   getDomNode,
+  createElement,
+  cloneElement,
   renderToDomNode } from '../src/internal/auto-dom';
 
 function SetName(name) {
@@ -35,43 +36,53 @@ const BoldNumbers = () =>
 
 const Greeting = (props) => {
   const { name, children } = props;
-  // console.log(props);
 
   return (
-    [A.h1, 'Hello ', name, children]
+    [A.h1,
+      'Hello ', name,
+      children]
   );
 };
 
 const smartComponentHooks = {
   onUpdate: (ref, { render, model, props }) => {
+    // console.log('onCreate');
     const renderComponent = () => {
+      // console.log(props);
       renderToDomNode(
-        getDomNode(ref),
+        ref,
         [render,
           { props,
             model }],
       );
     };
 
-    atomicState.addWatch(model, ref, renderComponent);
-    renderComponent();
+    const watchKey = getDomNode(ref);
+    atomicState.addWatch(
+      model, watchKey, renderComponent,
+    );
   },
 
   onDestroy: (ref, { model }) => {
-    atomicState.removeWatch(model, ref);
+    const watchKey = getDomNode(ref);
+    atomicState
+      .removeWatch(model, watchKey);
   },
 };
 
 const WithModel = (config) => {
+  const { render, props, model } = config;
   const { onUpdate,
           onDestroy } = smartComponentHooks;
+  const vnode = createElement([render, { props, model }]);
+  const newProps = {
+    onCreate: [onUpdate, config],
+    onUpdate: [onUpdate, config],
+    onDestroy: [onDestroy, config],
+  };
 
-  return (
-    // TODO: add support for using a comment node as initial render
-    [A.div,
-      { onCreate: [onUpdate, config],
-        onUpdate: [onUpdate, config],
-        onDestroy: [onDestroy, config] }]
+  return cloneElement(
+    vnode, newProps, vnode.children,
   );
 };
 
@@ -87,17 +98,20 @@ const SmartComponentRenderer = (innerProps) => {
   const { count } = atomicState.read(model);
 
   const Title = ({ children }) =>
-    [A.h3,
-      { class: css(styles.capitalize) },
-      children];
+    ([A.h3, { class: styles.capitalize },
+      children]);
+
+  const Section = ({ children }) =>
+    ([A.div, { class: styles.bold },
+      children]);
 
   const textFromProps = (
-    [A.div,
+    [Section,
       [Title, 'from props'],
       [A.strong, text]]);
 
   const counterFromModel = (
-    [A.div,
+    [Section,
       [Title, 'from model'],
       [A.div,
         'count: ', [A.strong, count]],
@@ -106,9 +120,10 @@ const SmartComponentRenderer = (innerProps) => {
         'increment']]);
 
   return (
-    [A.div, innerProps,
+    [A.div,
       textFromProps,
-      counterFromModel]);
+      counterFromModel,
+    ]);
 };
 
 const model = atomicState.atom({ count: 0 });
@@ -120,13 +135,14 @@ const SmartComponentExample = (props) =>
       render: SmartComponentRenderer }]);
 
 const Hello = ({ name, scope }) =>
-  ([A.div,
-    [name.length % 2 === 0
-      ? [SmartComponentExample, { text: `smart one ${name}` }]
-      : [null]],
+  ([A.div, { class: 'HelloRoot' },
+    [SmartComponentExample,
+      { text: `Smart one: ${name}` }],
     [NameInput, { name, scope }],
-    // [Greeting, { name }],
-    // [BoldNumbers]
+    [Greeting, { name },
+      // [Greeting, { name: 'static name' }],
+    ],
+    // [BoldNumbers],
   ]);
 
 export {
