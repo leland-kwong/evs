@@ -7,6 +7,44 @@ import { getSupportedEventTypes } from '../../get-event-types';
 import { isArray, isFunc,
   setValue, stringifyValueForLogging } from '../utils';
 
+const invalidComponentFormatMsg = (value) => {
+  const stringified = stringifyValueForLogging(value);
+
+  return outdent`
+    Sorry,
+
+    ${stringified.length > 300
+      ? `${stringified.slice(0, 300)} ...`
+      : stringified}
+
+    is not a valid component. This can happen when
+    we either nested the arrays too deeply or forgot to
+    wrap a component in an array.
+
+    The supported formats are:
+
+    \`\`\`javascript
+
+    // basic component
+    [Function, value1, value2, ...]
+
+    // component with props
+    [Function, Object, value1, value2, ...]
+
+    // collection of nodes
+    [value1, value2, ...]
+
+    // nested collections also work
+    [
+      [value1, value2],
+      value3,
+      [value4, value5]
+    ]
+
+    \`\`\`
+  `;
+};
+
 const vnodeType = Symbol('@vnode');
 
 const patch = snabbdom.init([
@@ -103,7 +141,9 @@ const validateValue = (value) => {
     `);
   }
 
-  const isObjectChild = typeof value === 'object';
+  const isObjectChild = value !== null
+    && !isVnode(value)
+    && isPlainObject(value);
 
   if (isObjectChild) {
     const stringified = stringifyValueForLogging(value);
@@ -121,41 +161,9 @@ const validateValue = (value) => {
     && value.find(isArray);
 
   if (isInvalidCollection) {
-    const stringified = (() => {
-      const res = stringifyValueForLogging(value);
-      if (res.length > 300) {
-        return `${res.slice(0, 300)} ...`;
-      }
-      return res;
-    })();
-
-    throw new Error(outdent`
-      Sorry,
-
-      ${stringified}
-
-      is not a valid component. This can happen when
-      we either nested the arrays too deeply or forgot to
-      wrap a component in an array.
-
-      The supported formats are:
-
-      \`\`\`javascript
-
-      // basic component
-      [Function, value1, value2, ...]
-
-      // component with props
-      [Function, Object, value1, value2, ...]
-
-      // collection of nodes
-      [value1, value2, ...]
-
-      // collection of nodes with a map function
-      [Array, Function]
-
-      \`\`\`
-    `);
+    throw new Error(
+      invalidComponentFormatMsg(value),
+    );
   }
 
   return value;
@@ -273,7 +281,7 @@ const getLispFunc = (lisp) =>
  * Recursively processes a tree of Arrays
  * as lisp data structures.
  */
-const processLisp = (value) => {
+const processLisp = (value, depth) => {
   const isList = isArray(value);
   /**
    * lisp structure is:
@@ -314,15 +322,20 @@ const processLisp = (value) => {
  * ```
  */
 const defineElement = (tagName) => {
-  const elementFactory = (props) =>
-    Vnode(tagName, props);
+  function elementFactory(props) {
+    return Vnode(tagName, props);
+  }
 
-  elementFactory.isVnodeFactory = true;
-
-  return elementFactory;
+  const defineProps = Object.defineProperties;
+  return defineProps(elementFactory, {
+    name: {
+      value: tagName,
+    },
+    isVnodeFactory: {
+      value: true,
+    },
+  });
 };
-
-const createElement = processLisp;
 
 /*
  * TODO:
@@ -349,7 +362,6 @@ const nativeElements = Object.keys(elementTypes)
 
 export {
   defineElement,
-  createElement,
   nativeElements,
   renderToDomNode,
   getDomNode,

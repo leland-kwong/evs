@@ -35,12 +35,16 @@ module.exports = {
       },
     ],
     "object-curly-newline": ["error", {
-      // "ObjectExpression": "always",
       "consistent": true,
-      // "ObjectPattern": { "multiline": true },
-      // "ImportDeclaration": "never",
-      // "ExportDeclaration": { "multiline": true, "minProperties": 3 }
     }],
+    // "comma-dangle": ["error", {
+    //   "arrays": "multiline",
+    //   // "objects": "never",
+    //   // "imports": "never",
+    //   // "exports": "never",
+    //   // "functions": "never"
+    // }],
+    // "comma-spacing": ["error", { "after": false }]
   },
   "settings": {
     "import/resolver": {

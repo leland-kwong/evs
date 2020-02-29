@@ -5,7 +5,6 @@ import {
   Hello,
   renderToDomNode,
   nativeElements,
-  createElement,
 } from './prototype.ldom';
 
 const makeTodoId = () =>
