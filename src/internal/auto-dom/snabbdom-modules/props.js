@@ -3,20 +3,22 @@
 Object.defineProperty(exports, '__esModule', { value: true });
 
 const hookType = require('./hook-type');
+const { call } = require('../../utils');
 
 const emptyObject = Object.freeze({});
+
+const execHook = (vnode, hookConfig) => {
+  const [hookFn, hookArg] = hookConfig || [];
+  call([hookFn, vnode, hookArg]);
+};
 
 function updateProps(hook, oldVnode, vnode) {
   let key; const { elm } = vnode;
   const { props: oldProps = emptyObject } = oldVnode;
   const { props } = vnode;
   const { handleProp } = vnode.data;
-  const hookFn = props[hook];
 
-  // lifecycle hooks like onCreate, onUpdate, etc...
-  if (hookFn) {
-    hookFn(vnode);
-  }
+  execHook(vnode, props[hook]);
 
   for (key in props) {
     const prev = oldProps[key];
@@ -39,6 +41,12 @@ function updateProps(hook, oldVnode, vnode) {
   }
 }
 
+function onDestroy(hook, oldVnode) {
+  const { props } = oldVnode;
+
+  execHook(oldVnode, props[hook]);
+}
+
 exports.propsModule = {
   /*
    * TODO:
@@ -53,5 +61,9 @@ exports.propsModule = {
   update: (oldVnode, vnode) => {
     updateProps(hookType.update, oldVnode, vnode);
   },
+  destroy: (oldVnode, vnode) => {
+    onDestroy(hookType.destroy, oldVnode, vnode);
+  },
 };
+
 exports.default = exports.propsModule;
