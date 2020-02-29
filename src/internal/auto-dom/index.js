@@ -139,7 +139,6 @@ const allowedPrimitiveTypes = new Set([
 ]);
 
 function coerceToVnode(newChildren, value) {
-  // ignore falsy values
   if (ignoredValues.has(value)) {
     return newChildren;
   }
@@ -161,11 +160,16 @@ function coerceToVnode(newChildren, value) {
   if (process.env.NODE_ENV === 'development') {
     validateValue(value);
   }
+
   return value;
 }
 
 const createVnode = (tagName, props) => {
-  const { children = [] } = props;
+  const {
+    children = [],
+    // special snabbdom hooks
+    $hook: elementHooks = {},
+  } = props;
   const hasNestedCollections = children.find(isArray);
   const flattendChildren = hasNestedCollections
     ? children.flat()
@@ -180,6 +184,7 @@ const createVnode = (tagName, props) => {
      * snabbdom to work
      */
     data: {
+      hook: elementHooks,
       handleProp,
     },
     children: flattendChildren
@@ -340,8 +345,16 @@ const nativeElements = Object.keys(elementTypes)
     return e;
   }, {});
 
-// this is how you create a comment in snabbdom
-nativeElements.comment = defineElement('!');
+nativeElements.comment = (() => {
+  // the `!` symbol is a comment in snabbdom
+  const vnodeFactory = defineElement('!');
+
+  return (props) =>
+    Object.assign(
+      vnodeFactory(props),
+      { text: props.children },
+    );
+})();
 
 export {
   defineElement,
