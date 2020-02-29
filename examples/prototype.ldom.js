@@ -1,5 +1,7 @@
 import * as atomicState from 'atomic-state';
+import { css } from 'emotion';
 import * as evs from '../src';
+import * as styles from './styles';
 import { nativeElements as A,
   getDomNode,
   renderToDomNode } from '../src/internal/auto-dom';
@@ -40,33 +42,36 @@ const Greeting = (props) => {
   );
 };
 
-const WithModel = ({
-  model,
-  // mapData = (v) =>
-  //   v,
-  render,
-  props,
-}) => {
-  const onUpdate = (ref) => {
+const smartComponentHooks = {
+  onUpdate: (ref, { render, model, props }) => {
     const renderComponent = () => {
       renderToDomNode(
         getDomNode(ref),
         [render,
           { props,
-            model,
-            render }],
+            model }],
       );
     };
 
     atomicState.addWatch(model, ref, renderComponent);
     renderComponent();
-  };
+  },
+
+  onDestroy: (ref, { model }) => {
+    atomicState.removeWatch(model, ref);
+  },
+};
+
+const WithModel = (config) => {
+  const { onUpdate,
+          onDestroy } = smartComponentHooks;
 
   return (
-    // TODO: add support for rendering a comment node to start with
+    // TODO: add support for using a comment node as initial render
     [A.div,
-      { onCreate: onUpdate,
-        onUpdate }]
+      { onCreate: [onUpdate, config],
+        onUpdate: [onUpdate, config],
+        onDestroy: [onDestroy, config] }]
   );
 };
 
@@ -78,12 +83,12 @@ const SmartComponentRenderer = (innerProps) => {
       ({ count: count + 1 }));
   };
 
-  const { text } = props;
+  const { text = '' } = props;
   const { count } = atomicState.read(model);
 
   const Title = ({ children }) =>
     [A.h3,
-      { style: { textTransform: 'capitalize' } },
+      { class: css(styles.capitalize) },
       children];
 
   const textFromProps = (
@@ -115,13 +120,14 @@ const SmartComponentExample = (props) =>
       render: SmartComponentRenderer }]);
 
 const Hello = ({ name, scope }) =>
-  [A.div,
-    [SmartComponentExample,
-      { text: `Smart one ${name}` }],
+  ([A.div,
+    [name.length % 2 === 0
+      ? [SmartComponentExample, { text: `smart one ${name}` }]
+      : [null]],
     [NameInput, { name, scope }],
-    [Greeting, { name }],
-    [BoldNumbers],
-  ];
+    // [Greeting, { name }],
+    // [BoldNumbers]
+  ]);
 
 export {
   Hello,
