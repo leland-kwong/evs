@@ -24,15 +24,16 @@ const Hello = ({ name }) => {
 }
 ```
 
+Components are lazily evaluated, whereas native dom elements like `div` and `span` are eagerly evaluated.
+
 ### Render a list
 ```js
 const numbers = [1, 2]
-const Doubled = num => num * 2
-const List = [numbers, Doubled]
+const abc = ['a', 'b', 'c'];
 
 // lists are also automatically expanded
 const AsFragment = (
-  [div, 1, [List], [List]] // <div>1 2 4 2 4</div>
+  [div, numbers, abc] // <div>12abc</div>
 )
 ```
 

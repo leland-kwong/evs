@@ -164,8 +164,7 @@ function coerceToVnode(newChildren, value) {
   return value;
 }
 
-/* rename this to createVnode or something more idiomatic */
-const Vnode = (tagName, props) => {
+const createVnode = (tagName, props) => {
   const { children = [] } = props;
   const hasNestedCollections = children.find(isArray);
   const flattendChildren = hasNestedCollections
@@ -204,7 +203,7 @@ const cloneElement = (vnode, props, children) => {
                      ...props,
                      children };
 
-  return Vnode(sel, newProps);
+  return createVnode(sel, newProps);
 };
 
 const prepareArgs = (
@@ -304,7 +303,7 @@ const createElement = processLisp;
  */
 const defineElement = (tagName) => {
   function elementFactory(props) {
-    return Vnode(tagName, props);
+    return createVnode(tagName, props);
   }
 
   const defineProps = Object.defineProperties;
