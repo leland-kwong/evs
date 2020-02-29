@@ -246,7 +246,7 @@ const getLispFunc = (lisp) =>
  * Recursively processes a tree of Arrays
  * as lisp data structures.
  */
-const processLisp = (value, depth) => {
+const processLisp = (value) => {
   const isList = isArray(value);
   /**
    * lisp structure is:
