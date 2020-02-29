@@ -5,8 +5,9 @@ import snabbdomProps from './snabbdom-modules/props';
 import { elementTypes } from '../element-types';
 import { getSupportedEventTypes } from '../../get-event-types';
 import { invalidComponentMsg } from './invalid-component-msg';
+import { string } from '../string';
 import { isArray, isFunc,
-  setValue, stringifyValueForLogging } from '../utils';
+  setValue, identity, stringifyValueForLogging } from '../utils';
 
 const vnodeType = Symbol('@vnode');
 
@@ -93,27 +94,23 @@ const validateValue = (value) => {
     `);
   }
 
-  const isObjectChild = value !== null
-    && !isVnode(value)
-    && isPlainObject(value);
+  const isObjectChild = typeof value === 'object';
 
   if (isObjectChild) {
     const stringified = stringifyValueForLogging(value);
-    throw new Error(outdent`
-      Sorry, objects are not valid as a child.
-
-      Received:
-      ${stringified}
-
-    `);
+    throw new Error(string([
+      'Sorry, objects are not valid as a child. If ',
+      'you meant to render a collection you should ',
+      'use an array instead. Received:\n\n',
+      stringified,
+      '\n',
+    ]));
   }
 
   // children should not be nested arrays
-  const isInvalidCollection = isArray(value);
+  const isNestedCollection = isArray(value);
 
-  if (isInvalidCollection
-      && process.env.NODE_ENV === 'development'
-  ) {
+  if (isNestedCollection) {
     throw new Error(
       invalidComponentMsg(value),
     );
@@ -129,15 +126,21 @@ function textVnode(text) {
   };
 }
 
-const falsyValues = new Set([
+const ignoredValues = new Set([
   false,
+  true,
   null,
   undefined,
 ]);
 
+const allowedPrimitiveTypes = new Set([
+  'string',
+  'number',
+]);
+
 function coerceToVnode(newChildren, value) {
   // ignore falsy values
-  if (falsyValues.has(value)) {
+  if (ignoredValues.has(value)) {
     return newChildren;
   }
 
@@ -146,16 +149,28 @@ function coerceToVnode(newChildren, value) {
     return newChildren;
   }
 
-  // everything else we consider text
-  newChildren.push(
-    textVnode(value),
-  );
-  return newChildren;
+  const isPrimitive = allowedPrimitiveTypes
+    .has(typeof value);
+  if (isPrimitive) {
+    newChildren.push(
+      textVnode(value),
+    );
+    return newChildren;
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    validateValue(value);
+  }
+  return value;
 }
 
 /* rename this to createVnode or something more idiomatic */
 const Vnode = (tagName, props) => {
   const { children = [] } = props;
+  const hasNestedCollections = children.find(isArray);
+  const flattendChildren = hasNestedCollections
+    ? children.flat()
+    : children;
 
   return {
     sel: tagName,
@@ -168,9 +183,8 @@ const Vnode = (tagName, props) => {
     data: {
       handleProp,
     },
-    children: children.reduce(
-      coerceToVnode, [],
-    ),
+    children: flattendChildren
+      .reduce(coerceToVnode, []),
     [vnodeType]: true,
   };
 };
@@ -193,36 +207,28 @@ const cloneElement = (vnode, props, children) => {
   return Vnode(sel, newProps);
 };
 
-const identity = (v) =>
-  v;
-
 const prepareArgs = (
   lisp = [],
   callback = identity,
 ) => {
-  // console.log(lisp);
   const startFrom = 1;
-  const endAt = lisp.length;
   const { length } = lisp;
-  let hasArrayValue = false;
   let i = startFrom;
   // mutated in while loop
   const args = new Array(length - startFrom);
 
-  while (i < endAt) {
-    const arg = lisp[i];
-    const value = callback(arg);
+  while (i < length) {
+    const value = callback(lisp[i]);
     const currentIndex = i - startFrom;
 
-    hasArrayValue = hasArrayValue || isArray(value);
     args[currentIndex] = value;
     i += 1;
   }
 
-  return [args, hasArrayValue];
+  return args;
 };
 
-const parseProps = (args, hasArrayValue) => {
+const parseProps = (args) => {
   const firstArg = args[0];
   const hasProps = isPlainObject(firstArg)
     && !isVnode(firstArg);
@@ -230,17 +236,10 @@ const parseProps = (args, hasArrayValue) => {
     // remove the first argument
     ? args.shift() : {};
   const { children: childrenFromProps } = props;
-  const children = hasArrayValue
-    // auto-expand children
-    ? args.flat() : args;
+  const children = args;
   const combinedChildren = childrenFromProps
     ? [...childrenFromProps, ...children]
     : children;
-
-  if (process.env.NODE_ENV === 'development') {
-    combinedChildren
-      .forEach(validateValue);
-  }
 
   /**
    * we can validate/sanitize the props
@@ -275,9 +274,13 @@ const processLisp = (value) => {
   }
 
   const f = getLispFunc(value);
+  const argProcessor = f.isVnodeFactory
+    // eagerly evaluate for vnodes
+    ? processLisp
+    : identity;
   // everything after the first value
-  const [args, hasArrayValue] = prepareArgs(value, processLisp);
-  const props = parseProps(args, hasArrayValue);
+  const args = prepareArgs(value, argProcessor);
+  const props = parseProps(args);
   const nextValue = f(props);
 
   return processLisp(nextValue);

@@ -1,5 +1,8 @@
 export const noop = () => {};
 
+export const identity = (v) =>
+  v;
+
 export const { isArray } = Array;
 
 export const setValue = (obj, key, value) => {
@@ -19,10 +22,18 @@ export const stringifyValueForLogging = (
     return value.toString();
   }
 
+  const isPlainObject = value
+    && value.constructor === Object;
+
+  if (!isPlainObject) {
+    return value.toString();
+  }
+
   return JSON.stringify(value, (key, v) => {
     if (isFunc(v)) {
       return v.toString();
     }
+
     return v;
   });
 };
