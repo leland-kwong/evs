@@ -1,220 +1,24 @@
 import isPlainObject from 'is-plain-object';
-import { outdent } from 'outdent';
-import * as snabbdom from 'snabbdom';
+import { init as snabbdomInit } from 'snabbdom';
 import snabbdomProps from './snabbdom-modules/props';
 import { elementTypes } from '../element-types';
-import { getSupportedEventTypes } from '../../get-event-types';
-import { invalidComponentMsg } from './invalid-component-msg';
-import { string } from '../string';
+import {
+  isVnode, createVnode, ignoredValues, primitiveTypes,
+} from './vnode';
+
 import { isArray, isFunc,
-  setValue, identity, stringifyValueForLogging } from '../utils';
+  identity } from '../utils';
 
-const vnodeType = Symbol('@vnode');
 
-const patch = snabbdom.init([
+const patch = snabbdomInit([
   snabbdomProps,
 ]);
-
-// vnode utils
-const isVnode = (node) =>
-  (node
-    ? node[vnodeType]
-    : false);
-
-const getDomNode = (vnode) =>
-  vnode.elm;
-
-const remappedEventTypes = {
-  focusin: 'focus',
-  focusout: 'blur',
-};
-
-const handleProp = Object.freeze({
-  // do nothing here because we want to
-  // exclude it from being applied to the dom
-  children() {},
-
-  style(oldStyle = {}, newStyleObj, ref) {
-    const domNode = getDomNode(ref);
-    Object.keys(newStyleObj).forEach((k) => {
-      const nextValue = newStyleObj[k];
-      const isSameValue = oldStyle[k] === nextValue;
-
-      if (isSameValue) return;
-      setValue(
-        domNode.style, k, nextValue,
-      );
-    });
-  },
-
-  class(oldValue, newValue, ref) {
-    setValue(
-      getDomNode(ref), 'className', newValue,
-    );
-  },
-
-  /*
-   * TODO:
-   * We should probably setup the synthetic event system
-   * so we can do more advance event handling that the
-   * traditional system can't do for us.
-   */
-  // setup builtin dom event types
-  ...[
-    ...getSupportedEventTypes(),
-    'focusin',
-    'focusout',
-  ].reduce((handlerCallbacks, eventName) => {
-    const h = handlerCallbacks;
-    const remappedName = remappedEventTypes[eventName];
-    const domEventPropName = `on${remappedName || eventName}`;
-
-    h[domEventPropName] = (
-      oldValue, newValue, ref,
-    ) => {
-      getDomNode(ref)[
-        domEventPropName] = newValue;
-    };
-
-    return handlerCallbacks;
-  }, {}),
-});
-
-const validateValue = (value) => {
-  const isFuncChild = isFunc(value);
-
-  if (isFuncChild) {
-    const stringified = stringifyValueForLogging(value);
-    throw new Error(outdent`
-      Sorry, functions are not valid as a child.
-
-      Received:
-      ${stringified}
-
-    `);
-  }
-
-  const isObjectChild = typeof value === 'object';
-
-  if (isObjectChild) {
-    const stringified = stringifyValueForLogging(value);
-    throw new Error(string([
-      'Sorry, objects are not valid as a child. If ',
-      'you meant to render a collection you should ',
-      'use an array instead. Received:\n\n',
-      stringified,
-      '\n',
-    ]));
-  }
-
-  // children should not be nested arrays
-  const isNestedCollection = isArray(value);
-
-  if (isNestedCollection) {
-    throw new Error(
-      invalidComponentMsg(value),
-    );
-  }
-
-  return value;
-};
-
-function textVnode(text) {
-  return {
-    text,
-    [vnodeType]: true,
-  };
-}
-
-const ignoredValues = new Set([
-  false,
-  true,
-  null,
-  undefined,
-]);
-
-const allowedPrimitiveTypes = new Set([
-  'string',
-  'number',
-]);
-
-function coerceToVnode(newChildren, value) {
-  if (ignoredValues.has(value)) {
-    return newChildren;
-  }
-
-  if (isVnode(value)) {
-    newChildren.push(value);
-    return newChildren;
-  }
-
-  const isPrimitive = allowedPrimitiveTypes
-    .has(typeof value);
-  if (isPrimitive) {
-    newChildren.push(
-      textVnode(value),
-    );
-    return newChildren;
-  }
-
-  if (process.env.NODE_ENV === 'development') {
-    validateValue(value);
-  }
-
-  return value;
-}
-
-const createVnode = (tagName, props) => {
-  const {
-    children = [],
-    // special snabbdom hooks
-    $hook: elementHooks = {},
-  } = props;
-  const hasNestedCollections = children.find(isArray);
-  const flattendChildren = hasNestedCollections
-    ? children.flat()
-    : children;
-
-  return {
-    sel: tagName,
-    props,
-    /*
-     * TODO:
-     * Check if `data` property is necessary for
-     * snabbdom to work
-     */
-    data: {
-      hook: elementHooks,
-      handleProp,
-    },
-    children: flattendChildren
-      .reduce(coerceToVnode, []),
-    [vnodeType]: true,
-  };
-};
-
-/**
- * Clone and return a new vnode. New children will
- * replace existing children.
- */
-const cloneElement = (vnode, props, children) => {
-  const { sel } = vnode;
-  /*
-   * TODO:
-   * Need to figure out an idiomatic way to also
-   * combine the hooks
-   */
-  const newProps = { ...vnode.props,
-                     ...props,
-                     children };
-
-  return createVnode(sel, newProps);
-};
 
 const prepareArgs = (
   lisp = [],
   callback = identity,
 ) => {
+  // skip first value since it is the lisp function
   const startFrom = 1;
   const { length } = lisp;
   let i = startFrom;
@@ -232,7 +36,13 @@ const prepareArgs = (
   return args;
 };
 
-const parseProps = (args) => {
+/**
+ * @param {Array|arguments} value
+ * @param {Function} argProcessor
+ * @returns props object
+ */
+const parseProps = (value = [], argProcessor) => {
+  const args = prepareArgs(value, argProcessor);
   const firstArg = args[0];
   const hasProps = isPlainObject(firstArg)
     && !isVnode(firstArg);
@@ -282,15 +92,19 @@ const processLisp = (value) => {
     // eagerly evaluate for vnodes
     ? processLisp
     : identity;
-  // everything after the first value
-  const args = prepareArgs(value, argProcessor);
-  const props = parseProps(args);
+  const props = parseProps(value, argProcessor);
   const nextValue = f(props);
 
   return processLisp(nextValue);
 };
 
-const createElement = processLisp;
+const createElement = (value) => {
+  if (isVnode(value)) {
+    return value;
+  }
+
+  return processLisp(value);
+};
 
 /**
  * Generates a convenience method for element factories
@@ -345,22 +159,56 @@ const nativeElements = Object.keys(elementTypes)
     return e;
   }, {});
 
-nativeElements.comment = (() => {
-  // the `!` symbol is a comment in snabbdom
-  const vnodeFactory = defineElement('!');
+// the `!` symbol is a comment in snabbdom
+nativeElements.comment = defineElement('!');
 
-  return (props) =>
-    Object.assign(
-      vnodeFactory(props),
-      { text: props.children },
-    );
-})();
+/**
+ * Clone and return a new vnode. New children will
+ * replace existing children.
+ */
+const cloneElement = (...args) => {
+  const [element, config, children = []] = args;
+  const value = createElement(element);
+
+  if (ignoredValues.has(value)) {
+    return value;
+  }
+
+  if (primitiveTypes.has(typeof value)) {
+    return value;
+  }
+
+  /*
+   * TODO:
+   * Need to figure out an idiomatic way to also
+   * combine the hooks
+   */
+  const { sel } = value;
+  const props = config
+    ? { ...value.props,
+        ...config }
+    : value.props;
+  const childrenLength = args.length - 2;
+
+  if (childrenLength === 1) {
+    props.children = children;
+  } else if (childrenLength > 1) {
+    const childArray = Array(childrenLength);
+    for (let i = 0; i < childrenLength; i += 1) {
+      childArray[i] = args[i + 2];
+    }
+    props.children = childArray;
+  }
+
+  return createVnode(sel, props);
+};
 
 export {
   defineElement,
   nativeElements,
   renderToDomNode,
-  getDomNode,
   createElement,
   cloneElement,
 };
+
+export { getDomNode } from './vnode';
