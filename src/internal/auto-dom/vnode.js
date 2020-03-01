@@ -28,7 +28,7 @@ const handleProp = Object.freeze({
 
   $$refId(oldId, newId, oldRef, newRef) {
     const domNode = getDomNode(newRef);
-    domNode.setAttribute('data-ref-id', newId.join('.'));
+    domNode.setAttribute('data-ref-id', newId);
   },
 
   style(oldStyle, newStyleObj, oldRef, ref) {
@@ -195,13 +195,13 @@ const createVnode = (tagName, props) => {
   return {
     sel: tagName,
     props,
+    key: props.key,
     /*
      * TODO:
      * Check if `data` property is necessary for
      * snabbdom to work
      */
     data: {
-      key: props.key,
       hook: elementHooks,
       handleProp,
     },

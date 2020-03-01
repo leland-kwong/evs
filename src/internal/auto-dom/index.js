@@ -63,7 +63,14 @@ const parseProps = (value = [], argProcessor, path) => {
    */
   // don't mutate the original
   return { ...props,
-           $$refId: path,
+           /**
+            * @important
+            * This is necessary stateful components
+            * to use as a persistent key for
+            * storing stateful information in external
+            * sources.
+            */
+           $$refId: path.join('.'),
            children: combinedChildren };
 };
 
@@ -190,7 +197,7 @@ const renderToDomNode = (domNode, component) => {
  */
 const cloneElement = (...args) => {
   const [element, config, children = []] = args;
-  const value = createElement(element);
+  const value = createElement(element, config.$$refId);
 
   if (ignoredValues.has(value)) {
     return value;
