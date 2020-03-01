@@ -7,7 +7,8 @@ import {
 } from './vnode';
 
 import { isArray, isFunc,
-  identity } from '../utils';
+  identity,
+  isDef } from '../utils';
 
 
 const patch = snabbdomInit([
@@ -62,7 +63,7 @@ const parseProps = (value = [], argProcessor, path) => {
    */
   // don't mutate the original
   return { ...props,
-           refId: path,
+           $$refId: path,
            children: combinedChildren };
 };
 
@@ -105,12 +106,18 @@ const processLisp = (value, path = [0]) => {
   return processLisp(nextValue, nextPath);
 };
 
-const createElement = (value) => {
+const createElement = (value, rootId) => {
   if (isVnode(value)) {
     return value;
   }
 
-  return processLisp(value);
+  if (!isDef(rootId)) {
+    throw new Error(
+      '[createElement] `rootId` must be provided',
+    );
+  }
+
+  return processLisp(value, [rootId]);
 };
 
 /**
@@ -160,10 +167,15 @@ nativeElements.comment = defineElement('!');
  */
 const renderToDomNode = (domNode, component) => {
   const d = domNode;
-  const fromNode = d.oldVnode || domNode;
-  const toNode = createElement(component);
+  const { oldVnode } = d;
+  const fromNode = oldVnode || domNode;
+  const rootId = oldVnode
+    ? oldVnode.$$refId
+    : Math.random().toString(32).slice(2, 7);
+  const toNode = createElement(component, rootId);
 
   d.oldVnode = toNode;
+  d.oldVnode.$$refId = rootId;
   patch(fromNode, toNode);
 };
 

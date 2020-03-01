@@ -1,3 +1,6 @@
+export const isDef = (v) =>
+  v !== undefined;
+
 export const noop = () => {};
 
 export const identity = (v) =>
