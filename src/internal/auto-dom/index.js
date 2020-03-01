@@ -65,7 +65,7 @@ const parseProps = (value = [], argProcessor, path) => {
   return { ...props,
            /**
             * @important
-            * This is necessary stateful components
+            * This is necessary for stateful components
             * to use as a persistent key for
             * storing stateful information in external
             * sources.
