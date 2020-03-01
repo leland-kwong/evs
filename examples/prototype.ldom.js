@@ -102,7 +102,7 @@ const SmartComponentRenderer = (innerProps) => {
       children]);
 
   const Section = ({ children }) =>
-    ([A.div, { class: styles.bold },
+    ([A.div, { class: styles.Section },
       children]);
 
   const textFromProps = (
