@@ -86,7 +86,8 @@ const validateValue = (value) => {
     `);
   }
 
-  const isObjectChild = typeof value === 'object';
+  const isObjectChild = typeof value === 'object'
+    && !isVnode(value);
 
   if (isObjectChild) {
     const stringified = stringifyValueForLogging(value);
@@ -153,7 +154,7 @@ function coerceToVnode(newChildren, value) {
     validateValue(value);
   }
 
-  return value;
+  return newChildren;
 }
 
 const createVnode = (tagName, props) => {
@@ -177,6 +178,7 @@ const createVnode = (tagName, props) => {
      * snabbdom to work
      */
     data: {
+      key: props.key,
       hook: elementHooks,
       handleProp,
     },
