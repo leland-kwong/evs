@@ -107,17 +107,15 @@ const createElement = (value) => {
 };
 
 /**
- * Generates a convenience method for element factories
- * so we can do something like:
- *
- * const A = {
- *  div: defineElement('div'),
- *  span: defineElement('span'),
- * }
+ * Generates a convenience method for element factories.
  *
  * ```js
- * [A.div,
- *  [A.span, 1, 2, 3]]
+ * const div = defineElement('div')
+ * const span = defineElement('span')
+ *
+ * const MyComponent = () =>
+ *  ([div,
+ *    [span, 1, 2, 3]])
  * ```
  */
 const defineElement = (tagName) => {
