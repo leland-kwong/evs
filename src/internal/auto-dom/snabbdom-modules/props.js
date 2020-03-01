@@ -2,6 +2,11 @@
 /* eslint-disable no-restricted-syntax */
 Object.defineProperty(exports, '__esModule', { value: true });
 
+/**
+ * We can automatically apply an attribute if the
+ * property name to set does not exist on the dom node.
+ */
+
 const hookType = require('./hook-type');
 const { call, isFunc } = require('../../utils');
 
