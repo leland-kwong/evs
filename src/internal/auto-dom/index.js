@@ -17,6 +17,7 @@ const patch = snabbdomInit([
 const prepareArgs = (
   lisp = [],
   callback = identity,
+  path = [0],
 ) => {
   // skip first value since it is the lisp function
   const startFrom = 1;
@@ -26,7 +27,8 @@ const prepareArgs = (
   const args = new Array(length - startFrom);
 
   while (i < length) {
-    const value = callback(lisp[i]);
+    const itemIndex = i - startFrom;
+    const value = callback(lisp[i], [...path, itemIndex]);
     const currentIndex = i - startFrom;
 
     args[currentIndex] = value;
@@ -41,8 +43,8 @@ const prepareArgs = (
  * @param {Function} argProcessor
  * @returns props object
  */
-const parseProps = (value = [], argProcessor) => {
-  const args = prepareArgs(value, argProcessor);
+const parseProps = (value = [], argProcessor, path) => {
+  const args = prepareArgs(value, argProcessor, path);
   const firstArg = args[0];
   const hasProps = isPlainObject(firstArg)
     && !isVnode(firstArg);
@@ -60,6 +62,7 @@ const parseProps = (value = [], argProcessor) => {
    */
   // don't mutate the original
   return { ...props,
+           refId: path,
            children: combinedChildren };
 };
 
@@ -70,7 +73,7 @@ const getLispFunc = (lisp) =>
  * Recursively processes a tree of Arrays
  * as lisp data structures.
  */
-const processLisp = (value) => {
+const processLisp = (value, path = [0]) => {
   const isList = isArray(value);
   /**
    * lisp structure is:
@@ -81,7 +84,8 @@ const processLisp = (value) => {
 
   if (!isLispLike) {
     if (isList) {
-      return value.map(processLisp);
+      return value.map((v, i) =>
+        processLisp(v, [...path, i]));
     }
 
     return value;
@@ -92,10 +96,13 @@ const processLisp = (value) => {
     // eagerly evaluate for vnodes
     ? processLisp
     : identity;
-  const props = parseProps(value, argProcessor);
-  const nextValue = f(props);
+  const props = parseProps(value, argProcessor, path);
+  const nextValue = f(props, path);
 
-  return processLisp(nextValue);
+  const nextPath = [...path];
+  const lastIndex = nextPath.length - 1;
+  nextPath[lastIndex] += 1;
+  return processLisp(nextValue, nextPath);
 };
 
 const createElement = (value) => {
@@ -119,8 +126,8 @@ const createElement = (value) => {
  * ```
  */
 const defineElement = (tagName) => {
-  function elementFactory(props) {
-    return createVnode(tagName, props);
+  function elementFactory(props, refId) {
+    return createVnode(tagName, props, refId);
   }
 
   const defineProps = Object.defineProperties;

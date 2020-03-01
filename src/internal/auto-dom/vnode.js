@@ -26,6 +26,11 @@ const handleProp = Object.freeze({
   // exclude it from being applied to the dom
   children() {},
 
+  refId(oldId, newId, oldRef, newRef) {
+    const domNode = getDomNode(newRef);
+    domNode.setAttribute('data-ref-id', newId);
+  },
+
   style(oldStyle, newStyleObj, oldRef, ref) {
     const domNode = getDomNode(ref);
     const isDifferentDomNode = oldRef && oldRef.elm
