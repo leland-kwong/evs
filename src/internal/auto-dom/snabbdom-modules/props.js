@@ -28,7 +28,7 @@ function updateProps(hook, oldVnode, vnode) {
   const {
     props: oldProps = emptyObject,
   } = oldVnode;
-  const { props } = vnode;
+  const { props = emptyObject } = vnode;
   const { handleProp } = vnode.data;
 
   execHook(vnode, props[hook]);
