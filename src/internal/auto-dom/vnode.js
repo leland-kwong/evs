@@ -26,11 +26,29 @@ const handleProp = Object.freeze({
   // exclude it from being applied to the dom
   children() {},
 
-  style(oldStyle = {}, newStyleObj, ref) {
+  style(oldStyle, newStyleObj, oldRef, ref) {
     const domNode = getDomNode(ref);
+    const isDifferentDomNode = oldRef && oldRef.elm
+      !== ref.elm;
+
+    if (!newStyleObj) {
+      setValue(domNode, 'style', null);
+    }
+
+    // remove old styles
+    if (isDifferentDomNode) {
+      const hasOwn = Object.prototype.hasOwnProperty;
+      Object.keys(oldStyle || {}).forEach((k) => {
+        if (!hasOwn.call(newStyleObj, k)) {
+          setValue(domNode.style, k, null);
+        }
+      });
+    }
+
     Object.keys(newStyleObj).forEach((k) => {
       const nextValue = newStyleObj[k];
-      const isSameValue = oldStyle[k] === nextValue;
+      const isSameValue = oldStyle
+        && oldStyle[k] === nextValue;
 
       if (isSameValue) return;
       setValue(
@@ -39,7 +57,7 @@ const handleProp = Object.freeze({
     });
   },
 
-  class(oldValue, newValue, ref) {
+  class(oldValue, newValue, oldRef, ref) {
     setValue(
       getDomNode(ref), 'className', newValue,
     );
@@ -62,7 +80,7 @@ const handleProp = Object.freeze({
     const domEventPropName = `on${remappedName || eventName}`;
 
     h[domEventPropName] = (
-      oldValue, newValue, ref,
+      oldValue, newValue, oldRef, ref,
     ) => {
       getDomNode(ref)[
         domEventPropName] = newValue;

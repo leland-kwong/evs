@@ -11,6 +11,7 @@ const hookType = require('./hook-type');
 const { call, isFunc } = require('../../utils');
 
 const emptyObject = Object.freeze({});
+const hasOwn = Object.prototype.hasOwnProperty;
 
 const execHook = (vnode, hookConfig) => {
   if (isFunc(hookConfig)) {
@@ -23,14 +24,16 @@ const execHook = (vnode, hookConfig) => {
 };
 
 function updateProps(hook, oldVnode, vnode) {
-  let key; const { elm } = vnode;
-  const { props: oldProps = emptyObject } = oldVnode;
+  const { elm } = vnode;
+  const {
+    props: oldProps = emptyObject,
+  } = oldVnode;
   const { props } = vnode;
   const { handleProp } = vnode.data;
 
   execHook(vnode, props[hook]);
 
-  for (key in props) {
+  for (const key in props) {
     const prev = oldProps[key];
     const cur = props[key];
     const customFn = handleProp[key]
@@ -44,9 +47,21 @@ function updateProps(hook, oldVnode, vnode) {
       || handleProp[key.toLowerCase()];
 
     if (customFn) {
-      customFn(prev, cur, vnode);
+      customFn(prev, cur, oldVnode, vnode);
     } else {
       elm[key] = cur;
+    }
+  }
+
+  const cleanupOldProps = elm !== oldVnode.elm;
+  if (cleanupOldProps) {
+    for (const key in oldProps) {
+      const shouldRemove = !hasOwn
+        .call(props, key);
+
+      if (shouldRemove) {
+        delete elm[key];
+      }
     }
   }
 }
