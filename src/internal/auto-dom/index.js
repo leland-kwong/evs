@@ -134,6 +134,18 @@ const defineElement = (tagName) => {
   });
 };
 
+const nativeElements = Object.keys(elementTypes)
+  .reduce((elementFactories, tagName) => {
+    const e = elementFactories;
+
+    e[tagName] = defineElement(tagName);
+
+    return e;
+  }, {});
+
+// the `!` symbol is a comment in snabbdom
+nativeElements.comment = defineElement('!');
+
 /*
  * TODO:
  * Add support for rendering an array of vnodes
@@ -147,18 +159,6 @@ const renderToDomNode = (domNode, component) => {
   d.oldVnode = toNode;
   patch(fromNode, toNode);
 };
-
-const nativeElements = Object.keys(elementTypes)
-  .reduce((elementFactories, tagName) => {
-    const e = elementFactories;
-
-    e[tagName] = defineElement(tagName);
-
-    return e;
-  }, {});
-
-// the `!` symbol is a comment in snabbdom
-nativeElements.comment = defineElement('!');
 
 /**
  * Clone and return a new vnode. New children will
