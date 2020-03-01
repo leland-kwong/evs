@@ -144,17 +144,22 @@ function benchFn(
   const scope = evs.createScope('@vdomTest');
 
   const BenchCreateElement = ({ size = 1000, numTests = 5 }) => {
+    const rootId = Math.random();
     const range = Array(size).fill(0);
     const test = () => {
       range.forEach(() => {
         createElement(
           [Hello, { name: 'foo',
                     scope }],
+          rootId,
         );
       });
     };
 
-    const vNode = createElement([Hello, { name: 'foo', scope }]);
+    const vNode = createElement(
+      [Hello, { name: 'foo', scope }],
+      rootId,
+    );
     console.log(vNode);
 
     console.log(
