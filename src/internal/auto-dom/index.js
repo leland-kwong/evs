@@ -106,6 +106,11 @@ const processLisp = (value, path = [0]) => {
   return processLisp(nextValue, nextPath);
 };
 
+/**
+ * @param {Array} value atomic ui component
+ * @param {String | Number} rootId id prefix for component tree
+ * @returns vnode
+ */
 const createElement = (value, rootId) => {
   if (isVnode(value)) {
     return value;
