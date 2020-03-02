@@ -3,7 +3,7 @@ import { init as snabbdomInit } from 'snabbdom';
 import snabbdomProps from './snabbdom-modules/props';
 import { elementTypes } from '../element-types';
 import {
-  isVnode, createVnode, ignoredValues, primitiveTypes,
+  isVnode, createVnode, ignoredValues,
 } from './vnode';
 import { string } from '../string';
 import { isArray, isFunc,
@@ -11,7 +11,7 @@ import { isArray, isFunc,
   isDef,
   stringifyValueForLogging } from '../utils';
 
-const keyTypes = {
+const vnodeKeyTypes = {
   string: true,
   number: true,
   undefined: true,
@@ -24,7 +24,7 @@ const validateKey = (key) => {
     return key;
   }
 
-  if (!keyTypes[typeof key]) {
+  if (!vnodeKeyTypes[typeof key]) {
     throw new Error(string([
       'Key may only be a string or number. ',
       `Received: ${stringifyValueForLogging(key)}`,
@@ -167,12 +167,15 @@ const processLisp = (value, nodePath) => {
   const props = parseProps(value, argProcessor, pathArray);
   const nextValue = f(props, pathArray);
   const key = validateKey(
-    value.$$keyPassthrough
-    || props.key,
+    props.key || value.$$keyPassthrough,
   );
 
   if (isDef(key) && !ignoredValues.has(nextValue)) {
     if (isVnode(nextValue)) {
+      /**
+       * Automatically add key to vnode in case it
+       * wasn't passed through explicitly.
+       */
       nextValue.key = key;
     // pass key through to next component function
     } else {
@@ -183,23 +186,39 @@ const processLisp = (value, nodePath) => {
   return processLisp(nextValue, pathArray);
 };
 
+const validateSeedPath = (seedPath) => {
+  if (!vnodeKeyTypes[typeof seedPath]
+    && !isArray(seedPath)) {
+    throw new Error(string([
+      '[createElement] `seedPath` must be a string or ',
+      'an existing path from a vnode',
+    ]));
+  }
+
+  if (typeof seedPath === 'string'
+    && !keyRegex.test(seedPath)) {
+    throw new Error(string([
+      '[createElement] `seedPath` must satisfy',
+      `${keyRegex}. Received: ${seedPath}`,
+    ]));
+  }
+};
+
 /**
  * @param {Array} value atomic ui component
- * @param {String | Number} rootId id prefix for component tree
+ * @param {String | Number} seedPath id prefix for component tree
  * @returns vnode
  */
-const createElement = (value, rootId) => {
+const createElement = (value, seedPath) => {
   if (isVnode(value)) {
     return value;
   }
 
-  if (!isDef(rootId)) {
-    throw new Error(
-      '[createElement] `rootId` must be provided',
-    );
+  if (process.env.NODE_ENV === 'development') {
+    validateSeedPath(seedPath);
   }
 
-  return processLisp(value, rootId);
+  return processLisp(value, seedPath);
 };
 
 /**
@@ -253,7 +272,7 @@ const renderToDomNode = (domNode, component) => {
     : domNode.oldVnode;
   const fromNode = oldVnode || domNode;
   const rootId = oldVnode
-    ? oldVnode.props.$$refId
+    ? oldVnode.props.$$refPath
     : Math.random().toString(32).slice(2, 7);
   const toNode = createElement(component, rootId);
 
@@ -267,17 +286,11 @@ const renderToDomNode = (domNode, component) => {
  */
 const cloneElement = (...args) => {
   const [element, config, children = []] = args;
-  const value = createElement(
-    element,
-    element.props.$$refId,
-  );
 
-  if (ignoredValues.has(value)) {
-    return value;
-  }
-
-  if (primitiveTypes.has(typeof value)) {
-    return value;
+  if (!isVnode(element)) {
+    throw new Error(
+      '[cloneElement] Element must be a vnode',
+    );
   }
 
   /*
@@ -285,15 +298,15 @@ const cloneElement = (...args) => {
    * Need to figure out an idiomatic way to also
    * combine the hooks
    */
-  const { sel } = value;
+  const { sel } = element;
   const props = config
-    ? { ...value.props,
+    ? { ...element.props,
         ...config }
-    : value.props;
+    : element.props;
   const childrenLength = args.length - 2;
 
   if (childrenLength === 1) {
-    props.children = children;
+    props.children = [children];
   } else if (childrenLength > 1) {
     const childArray = Array(childrenLength);
     for (let i = 0; i < childrenLength; i += 1) {

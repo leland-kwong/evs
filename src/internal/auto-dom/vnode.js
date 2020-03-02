@@ -31,6 +31,11 @@ const handleProp = Object.freeze({
     domNode.setAttribute('data-ref-id', newId);
   },
 
+  key(oldKey, newKey, oldRef, newRef) {
+    getDomNode(newRef)
+      .setAttribute('data-key', newKey);
+  },
+
   style(oldStyle, newStyleObj, oldRef, ref) {
     const domNode = getDomNode(ref);
     const isDifferentDomNode = oldRef && oldRef.elm

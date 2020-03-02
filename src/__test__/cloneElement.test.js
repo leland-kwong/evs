@@ -8,66 +8,65 @@ describe('cloneElement', () => {
   test('clone with null value', () => {
     const Null = () =>
       null;
-    const element = [Null];
+    const element = createElement([Null], 'abc');
 
-    expect(
-      cloneElement(element),
-    ).toEqual(null);
+    expect(() => {
+      cloneElement(element);
+    }).toThrow();
   });
 
   test('clone with primitive value', () => {
     const Primitive = () =>
       1;
-    const element = [Primitive];
+    const element = createElement([Primitive], 'abc');
 
-    expect(
-      cloneElement(element),
-    ).toEqual(1);
+    expect(() => {
+      cloneElement(element);
+    }).toThrow();
   });
 
   test('clone with no new changes', () => {
-    const element = [A.div, 1, 2];
+    const LazyComponent = [A.div, 1, 2];
+    const element = createElement(LazyComponent, 'abc');
 
     expect(
       cloneElement(element),
     ).toEqual(
-      createElement(element),
+      createElement(LazyComponent, 'abc'),
     );
   });
 
   test('clone extends original props', () => {
     const baseProps = { foo: 'foo' };
     const newProps = { bar: 'bar' };
-    const Component = ({ foo, children }) =>
-      [A.div, foo, children];
+    const element = createElement(
+      [A.div, baseProps, 1, 2], 'abc',
+    );
 
     expect(
-      cloneElement([Component, baseProps, 1, 2], newProps)
-        .children,
+      cloneElement(element, newProps),
     ).toEqual(
       createElement(
-        [Component,
-          { ...baseProps,
-            ...newProps },
-          1, 2],
-      ).children,
+        [A.div,
+          { ...baseProps, ...newProps }, 1, 2],
+        'abc',
+      ),
     );
   });
 
-  test('clone replaces children new children', () => {
-    const baseProps = { foo: 'foo' };
-    const Component = ({ foo, children }) =>
-      [A.div, foo, children];
-    const result = cloneElement([Component, baseProps, 1, 2], null, 3)
-      .children;
-    const expected = createElement(
-      [A.div, 3],
-    ).children;
+  test('clone replaces children with new children', () => {
+    const element = createElement(
+      [A.div, 1, 2],
+      'abc',
+    );
 
     expect(
-      result,
+      cloneElement(element, null, 3),
     ).toEqual(
-      expected,
+      createElement(
+        [A.div, 3],
+        'abc',
+      ),
     );
   });
 });
