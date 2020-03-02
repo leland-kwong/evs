@@ -197,6 +197,7 @@ const createVnode = (tagName, props) => {
   const flattendChildren = hasNestedCollections
     ? childArray.flat()
     : childArray;
+  const isComment = tagName === '!';
 
   return {
     sel: tagName,
@@ -211,8 +212,13 @@ const createVnode = (tagName, props) => {
       hook: elementHooks,
       handleProp,
     },
-    children: flattendChildren
-      .reduce(coerceToVnode, []),
+    text: isComment
+      ? flattendChildren.join('')
+      : undefined,
+    children: isComment
+      ? []
+      : flattendChildren
+        .reduce(coerceToVnode, []),
     [vnodeType]: true,
   };
 };

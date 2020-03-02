@@ -7,6 +7,7 @@ Object.defineProperty(exports, '__esModule', { value: true });
  * property name to set does not exist on the dom node.
  */
 
+const { domNodeTypes } = require('../../../constants');
 const hookType = require('./hook-type');
 const { call, isFunc } = require('../../utils');
 
@@ -32,6 +33,10 @@ function updateProps(hook, oldVnode, vnode) {
   const { handleProp } = vnode.data;
 
   execHook(vnode, props[hook]);
+
+  if (domNodeTypes.comment === elm.nodeType) {
+    return;
+  }
 
   for (const key in props) {
     const prev = oldProps[key];
