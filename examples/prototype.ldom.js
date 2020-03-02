@@ -9,6 +9,7 @@ import { nativeElements as A,
   cloneElement,
   renderToDomNode,
   isElement } from '../src/internal/auto-dom';
+import { ignoredValues } from '../src/internal/auto-dom/vnode';
 
 function SetName(name) {
   return {
@@ -54,7 +55,6 @@ const smartComponentHooks = {
     const { key } = renderVnode;
     const { render, model, modelRefKey, props } = config;
     const renderComponent = () => {
-      // console.log(renderVnode);
       renderToDomNode(
         renderVnode,
         [render, { props,
@@ -85,22 +85,46 @@ const WithModel = (config) => {
   const renderConfig = {
     render, props, model: modelRef, modelRefKey,
   };
-  const vnode = createElement([render, renderConfig], $$refPath);
-  if (!isElement(vnode)) {
-    return vnode;
-  }
   const { onUpdate,
           onDestroy } = smartComponentHooks;
   const rootConfig = {
-    onCreate: [onUpdate, renderConfig],
+    $hook: {
+      init(ref) {
+        console.log('[init]', ref);
+        onUpdate(ref, renderConfig);
+      },
+    },
     onUpdate: [onUpdate, renderConfig],
     onDestroy: [onDestroy, renderConfig],
   };
+  const renderValue = createElement(
+    [render, renderConfig], $$refPath,
+  );
 
   modelsByRefId.set(modelRefKey, modelRef);
 
+  /*
+     * TODO:
+     * Since we're going to be using a hooks style
+     * module system, we need to move this logic
+     * over to the lisp processor. We also only need
+     * to do this when hooks are being used because
+     * there needs to be at least a comment/span node
+     * for snabbdom to trigger it.
+     */
+
+  // null, false, true, undefined
+  if (ignoredValues.has(renderValue)) {
+    return [A.comment, rootConfig, $$refId];
+  }
+
+  // primitive values
+  if (!isElement(renderValue)) {
+    return [A.span, rootConfig, renderValue];
+  }
+
   return cloneElement(
-    vnode, rootConfig,
+    renderValue, rootConfig,
   );
 };
 
@@ -173,8 +197,8 @@ const Hello = ({ name, scope }) =>
   ([A.div, { class: 'HelloRoot' },
     [ConditionalComp, {
       text: `Smart one: ${name}`,
-      // shouldShow: () =>
-      //   name.length % 2 === 0,
+      shouldShow: () =>
+        name.length % 2 === 0,
       key: 'c-1',
     }],
     [ConditionalComp, {
