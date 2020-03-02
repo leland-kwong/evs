@@ -183,6 +183,7 @@ function coerceToVnode(newChildren, value) {
 const createVnode = (tagName, props) => {
   const {
     children = [],
+    key,
     // special snabbdom hooks
     $hook: elementHooks = {},
   } = props;
@@ -195,7 +196,7 @@ const createVnode = (tagName, props) => {
   return {
     sel: tagName,
     props,
-    key: props.key,
+    key,
     /*
      * TODO:
      * Check if `data` property is necessary for

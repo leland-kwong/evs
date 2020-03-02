@@ -5,11 +5,9 @@ import { elementTypes } from '../element-types';
 import {
   isVnode, createVnode, ignoredValues, primitiveTypes,
 } from './vnode';
-
 import { isArray, isFunc,
   identity,
   isDef } from '../utils';
-
 
 const patch = snabbdomInit([
   snabbdomProps,
@@ -66,12 +64,31 @@ const parseProps = (value = [], argProcessor, path) => {
            /**
             * @important
             * This is necessary for stateful components
-            * to use as a persistent key for
-            * storing stateful information in external
-            * sources.
+            * to use as a key for external data sources.
             */
            $$refId: path.join('.'),
            children: combinedChildren };
+};
+
+/**
+ * Converts a tree path into array form, so
+ * if we received something like:
+ *
+ * `'uuid.1.2.5.0'` it would become an array
+ * `['uuid', 1, 2, 5, 0]`
+ *
+ * @param {String | Array} value
+ * @returns {Array}
+ */
+const parsePath = (value) => {
+  if (isArray(value)) {
+    return value;
+  }
+  // transforms the id back into the original path
+  return value.split('.').map((v) => {
+    const maybeNum = Number(v);
+    return !Number.isNaN(maybeNum) ? maybeNum : v;
+  });
 };
 
 const getLispFunc = (lisp) =>
@@ -81,7 +98,8 @@ const getLispFunc = (lisp) =>
  * Recursively processes a tree of Arrays
  * as lisp data structures.
  */
-const processLisp = (value, path = [0]) => {
+const processLisp = (value, nodePath) => {
+  const pathArray = parsePath(nodePath);
   const isList = isArray(value);
   /**
    * lisp structure is:
@@ -93,7 +111,7 @@ const processLisp = (value, path = [0]) => {
   if (!isLispLike) {
     if (isList) {
       return value.map((v, i) =>
-        processLisp(v, [...path, i]));
+        processLisp(v, [...pathArray, i]));
     }
 
     return value;
@@ -104,13 +122,20 @@ const processLisp = (value, path = [0]) => {
     // eagerly evaluate for vnodes
     ? processLisp
     : identity;
-  const props = parseProps(value, argProcessor, path);
-  const nextValue = f(props, path);
+  const props = parseProps(value, argProcessor, pathArray);
+  const nextValue = f(props, pathArray);
+  const key = value.$$keyPassthrough || props.key;
 
-  const nextPath = [...path];
-  const lastIndex = nextPath.length - 1;
-  nextPath[lastIndex] += 1;
-  return processLisp(nextValue, nextPath);
+  if (isDef(key) && !ignoredValues.has(nextValue)) {
+    if (isVnode(nextValue)) {
+      nextValue.key = key;
+    // pass key through to next component function
+    } else {
+      nextValue.$$keyPassthrough = key;
+    }
+  }
+
+  return processLisp(nextValue, pathArray);
 };
 
 /**
@@ -129,7 +154,8 @@ const createElement = (value, rootId) => {
     );
   }
 
-  return processLisp(value, [rootId]);
+  const id = isArray(rootId) ? rootId : [rootId];
+  return processLisp(value, id);
 };
 
 /**
@@ -178,17 +204,17 @@ nativeElements.comment = defineElement('!');
  * so we don't require a single parent vnode.
  */
 const renderToDomNode = (domNode, component) => {
-  const d = domNode;
-  const { oldVnode } = d;
+  const oldVnode = isVnode(domNode)
+    ? domNode
+    : domNode.oldVnode;
   const fromNode = oldVnode || domNode;
   const rootId = oldVnode
-    ? oldVnode.$$refId
+    ? oldVnode.props.$$refId
     : Math.random().toString(32).slice(2, 7);
   const toNode = createElement(component, rootId);
 
-  d.oldVnode = toNode;
-  d.oldVnode.$$refId = rootId;
   patch(fromNode, toNode);
+  toNode.elm.oldVnode = toNode;
 };
 
 /**
@@ -197,7 +223,10 @@ const renderToDomNode = (domNode, component) => {
  */
 const cloneElement = (...args) => {
   const [element, config, children = []] = args;
-  const value = createElement(element, config.$$refId);
+  const value = createElement(
+    element,
+    element.props.$$refId,
+  );
 
   if (ignoredValues.has(value)) {
     return value;
