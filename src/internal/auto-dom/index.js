@@ -199,8 +199,7 @@ const createElement = (value, rootId) => {
     );
   }
 
-  const id = isArray(rootId) ? rootId : [rootId];
-  return processLisp(value, id);
+  return processLisp(value, rootId);
 };
 
 /**
