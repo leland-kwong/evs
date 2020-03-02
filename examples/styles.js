@@ -11,4 +11,5 @@ export const bold = css`font-weight: bold;`;
 
 export const Section = css`
   margin: 1rem 0;
+  margin-right: 1rem;
 `;
