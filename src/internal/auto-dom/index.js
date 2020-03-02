@@ -127,7 +127,7 @@ const parsePath = (value) => {
     return value;
   }
   // transforms the id back into the original path
-  return value.split('.').map((v) => {
+  return String(value).split('.').map((v) => {
     const maybeNum = Number(v);
     return !Number.isNaN(maybeNum) ? maybeNum : v;
   });
