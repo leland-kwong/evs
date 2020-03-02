@@ -7,7 +7,8 @@ import * as styles from './styles';
 import { nativeElements as A,
   createElement,
   cloneElement,
-  renderToDomNode } from '../src/internal/auto-dom';
+  renderToDomNode,
+  isElement } from '../src/internal/auto-dom';
 
 function SetName(name) {
   return {
@@ -85,6 +86,9 @@ const WithModel = (config) => {
     render, props, model: modelRef, modelRefKey,
   };
   const vnode = createElement([render, renderConfig], $$refPath);
+  if (!isElement(vnode)) {
+    return vnode;
+  }
   const { onUpdate,
           onDestroy } = smartComponentHooks;
   const rootConfig = {
@@ -110,6 +114,10 @@ const SmartComponentRenderer = (innerProps) => {
 
   const { text = '', class: inStyle } = props;
   const { count } = atomicState.read(model);
+
+  if (text.length > 15) {
+    return null;
+  }
 
   const Title = ({ children }) =>
     ([A.h3, { class: styles.capitalize },
@@ -165,8 +173,8 @@ const Hello = ({ name, scope }) =>
   ([A.div, { class: 'HelloRoot' },
     [ConditionalComp, {
       text: `Smart one: ${name}`,
-      shouldShow: () =>
-        name.length % 2 === 0,
+      // shouldShow: () =>
+      //   name.length % 2 === 0,
       key: 'c-1',
     }],
     [ConditionalComp, {

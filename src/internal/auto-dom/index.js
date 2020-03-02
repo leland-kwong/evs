@@ -327,6 +327,7 @@ export {
   renderToDomNode,
   createElement,
   cloneElement,
+  isVnode as isElement,
 };
 
 export { getDomNode } from './vnode';
