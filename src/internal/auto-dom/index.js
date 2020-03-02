@@ -16,7 +16,7 @@ const vnodeKeyTypes = {
   number: true,
 };
 
-const keyRegex = /^[a-zA-Z0-9-_]*$/;
+const keyRegex = /^[a-zA-Z0-9-_@]*$/;
 
 const validateKey = (key) => {
   if (process.env.NODE_ENV !== 'development') {
@@ -44,9 +44,15 @@ const patch = snabbdomInit([
   snabbdomProps,
 ]);
 
+/**
+ * Makes a new list of arguments. This also
+ * gives us the safety to mutate it later without
+ * interfering with the original lisp structure.
+ * @returns {Array}
+ */
 const prepareArgs = (
   lisp = [],
-  callback = identity,
+  callback = null,
   path = [0],
 ) => {
   // skip first value since it is the lisp function
@@ -57,11 +63,13 @@ const prepareArgs = (
   const args = new Array(length - startFrom);
 
   while (i < length) {
-    const itemIndex = i - startFrom;
-    const value = callback(lisp[i], [...path, itemIndex]);
-    const currentIndex = i - startFrom;
+    const arg = lisp[i];
+    const argPosition = i - startFrom;
+    const evaluated = callback
+      ? callback(arg, [...path, argPosition])
+      : arg;
 
-    args[currentIndex] = value;
+    args[argPosition] = evaluated;
     i += 1;
   }
 
@@ -162,9 +170,8 @@ const processLisp = (value, nodePath) => {
 
   const f = getLispFunc(value);
   const argProcessor = f.isVnodeFactory
-    // eagerly evaluate for vnodes
-    ? processLisp
-    : identity;
+    // only eagerly evaluate when creating vnode
+    ? processLisp : null;
   const props = parseProps(value, argProcessor, pathArray);
   const nextValue = f(props, pathArray);
   const key = validateKey(
@@ -264,28 +271,64 @@ const nativeElements = Object.keys(elementTypes)
 // the `!` symbol is a comment in snabbdom
 nativeElements.comment = defineElement('!');
 
+let seedPathCount = 0;
+
+const generateSeedPath = () => {
+  seedPathCount += 1;
+  const randString = Math.random()
+    .toString(32)
+    .slice(2, 5);
+
+  return [seedPathCount, randString].join('');
+};
+
 /*
  * TODO:
  * Add support for rendering an array of vnodes
  * so we don't require a single parent vnode.
  */
-const renderToDomNode = (domNode, component) => {
+const renderToDomNode = (
+  domNode,
+  component,
+  seedPath,
+) => {
   const oldVnode = isVnode(domNode)
     ? domNode
     : domNode.oldVnode;
   const fromNode = oldVnode || domNode;
-  const rootId = oldVnode
+  const path = oldVnode
     ? oldVnode.props.$$refPath
-    : Math.random().toString(32).slice(2, 7);
-  const toNode = createElement(component, rootId);
+    : seedPath || generateSeedPath();
+  const toNode = createElement(component, path);
 
   patch(fromNode, toNode);
   toNode.elm.oldVnode = toNode;
 };
 
+/*
+ * TODO:
+ * instead of making a new vnode, we should just call `parseProps`
+ * then extend those props and return a new lisp element. This also
+ * follows with our laziness theme and omits the unecessary extra
+ * step of having to call `createElement` to create a vnode first.
+ * The new cloning logic becomes:
+ *
+ * ```js
+ * const lazyElement = [A.div, myProps, child1, child2];
+ * const elementCtor = lazyElement[0]
+ * const props = parseProps(lazyElement);
+ * const newProps = {};
+ * const newChildren = [];
+ * const newElement = [
+ *  elementCtor,
+ *  {...props, ...newProps},
+ *  newChildren
+ * ];
+ * ```
+ */
 /**
- * Clone and return a new vnode. New children will
- * replace existing children.
+ * Extend an element factory, returning a new factory.
+ * New children will replace existing children.
  */
 const cloneElement = (...args) => {
   const [element, config, children = []] = args;
