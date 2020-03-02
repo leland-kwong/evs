@@ -14,7 +14,6 @@ import { isArray, isFunc,
 const vnodeKeyTypes = {
   string: true,
   number: true,
-  undefined: true,
 };
 
 const keyRegex = /^[a-zA-Z0-9-_]*$/;
@@ -24,16 +23,18 @@ const validateKey = (key) => {
     return key;
   }
 
-  if (!vnodeKeyTypes[typeof key]) {
-    throw new Error(string([
-      'Key may only be a string or number. ',
-      `Received: ${stringifyValueForLogging(key)}`,
-    ]));
-  } else if (!keyRegex.test(key)) {
-    throw new Error(string([
-      `Key must satisfy the this pattern ${keyRegex}. `,
-      `Received: ${stringifyValueForLogging(key)}`,
-    ]));
+  if (isDef(key)) {
+    if (!vnodeKeyTypes[typeof key]) {
+      throw new Error(string([
+        'Key may only be a string or number. ',
+        `Received: ${stringifyValueForLogging(key)}`,
+      ]));
+    } else if (!keyRegex.test(key)) {
+      throw new Error(string([
+        `Key must satisfy the this pattern ${keyRegex}. `,
+        `Received: ${stringifyValueForLogging(key)}`,
+      ]));
+    }
   }
 
   return key;
@@ -188,7 +189,8 @@ const processLisp = (value, nodePath) => {
 
 const validateSeedPath = (seedPath) => {
   if (!vnodeKeyTypes[typeof seedPath]
-    && !isArray(seedPath)) {
+    && !isArray(seedPath)
+  ) {
     throw new Error(string([
       '[createElement] `seedPath` must be a string or ',
       'an existing path from a vnode',
@@ -196,7 +198,8 @@ const validateSeedPath = (seedPath) => {
   }
 
   if (typeof seedPath === 'string'
-    && !keyRegex.test(seedPath)) {
+    && !keyRegex.test(seedPath)
+  ) {
     throw new Error(string([
       '[createElement] `seedPath` must satisfy',
       `${keyRegex}. Received: ${seedPath}`,

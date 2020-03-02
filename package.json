@@ -7,7 +7,7 @@
   "scripts": {
     "start": "NODE_ENV=development webpack-dev-server --open",
     "build": "webpack",
-    "test": "jest --watch --no-cache",
+    "test": "NODE_ENV=development jest --watch --no-cache",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
   },
   "keywords": [],
