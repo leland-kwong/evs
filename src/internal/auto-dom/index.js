@@ -173,7 +173,7 @@ const processLisp = (value, nodePath) => {
 
   if (isDef(key) && !ignoredValues.has(nextValue)) {
     if (isVnode(nextValue)) {
-      nextValue.props.key = key;
+      nextValue.key = key;
     // pass key through to next component function
     } else {
       nextValue.$$keyPassthrough = key;
