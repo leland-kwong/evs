@@ -5,9 +5,39 @@ import { elementTypes } from '../element-types';
 import {
   isVnode, createVnode, ignoredValues, primitiveTypes,
 } from './vnode';
+import { string } from '../string';
 import { isArray, isFunc,
   identity,
-  isDef } from '../utils';
+  isDef,
+  stringifyValueForLogging } from '../utils';
+
+const keyTypes = {
+  string: true,
+  number: true,
+  undefined: true,
+};
+
+const keyRegex = /^[a-zA-Z0-9-_]*$/;
+
+const validateKey = (key) => {
+  if (process.env.NODE_ENV !== 'development') {
+    return key;
+  }
+
+  if (!keyTypes[typeof key]) {
+    throw new Error(string([
+      'Key may only be a string or number. ',
+      `Received: ${stringifyValueForLogging(key)}`,
+    ]));
+  } else if (!keyRegex.test(key)) {
+    throw new Error(string([
+      `Key must satisfy the this pattern ${keyRegex}. `,
+      `Received: ${stringifyValueForLogging(key)}`,
+    ]));
+  }
+
+  return key;
+};
 
 const patch = snabbdomInit([
   snabbdomProps,
@@ -56,6 +86,17 @@ const parseProps = (value = [], argProcessor, path) => {
     ? [...childrenFromProps, ...children]
     : children;
 
+  if (props.key) {
+    /**
+     * Set the last position in the path to the key
+     * instead of the item's index. This is necessary
+     * for collections where items can have their
+     * positions change but we want to guarantee the
+     * ref path.
+     */
+    path.splice(-1, 1, props.key);
+  }
+
   /**
    * we can validate/sanitize the props
    */
@@ -67,6 +108,7 @@ const parseProps = (value = [], argProcessor, path) => {
             * to use as a key for external data sources.
             */
            $$refId: path.join('.'),
+           $$refPath: path,
            children: combinedChildren };
 };
 
@@ -124,7 +166,10 @@ const processLisp = (value, nodePath) => {
     : identity;
   const props = parseProps(value, argProcessor, pathArray);
   const nextValue = f(props, pathArray);
-  const key = value.$$keyPassthrough || props.key;
+  const key = validateKey(
+    value.$$keyPassthrough
+    || props.key,
+  );
 
   if (isDef(key) && !ignoredValues.has(nextValue)) {
     if (isVnode(nextValue)) {
