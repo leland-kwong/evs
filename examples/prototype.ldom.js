@@ -88,14 +88,12 @@ const WithModel = (config) => {
   const { onUpdate,
           onDestroy } = smartComponentHooks;
   const rootConfig = {
-    $hook: {
-      init(ref) {
-        console.log('[init]', ref);
-        onUpdate(ref, renderConfig);
-      },
-    },
-    onUpdate: [onUpdate, renderConfig],
-    onDestroy: [onDestroy, renderConfig],
+    hookInit: (vnode) =>
+      onUpdate(vnode, renderConfig),
+    hookUpdate: (vnode) =>
+      onUpdate(vnode, renderConfig),
+    hookDestroy: (vnode) =>
+      onDestroy(vnode, renderConfig),
   };
   const renderValue = createElement(
     [render, renderConfig], $$refPath,
@@ -193,8 +191,39 @@ const ConditionalComp = ({
       { text }]
     : null);
 
+const Lazy = ({ children }) => {
+  const filteredChildren = children
+    .reduce((out, condChild) => {
+      const [visible, Element] = condChild;
+
+      if (visible) {
+        out.push([Element]);
+      }
+
+      return out;
+    }, []);
+
+  return (
+    [A.div,
+      'lazy children',
+      [A.div,
+        filteredChildren]]
+  );
+};
+
+const PassThrough = (props) =>
+  props;
+
 const Hello = ({ name, scope }) =>
   ([A.div, { class: 'HelloRoot' },
+    [Lazy,
+      [PassThrough,
+        [true, () =>
+          [1, 2, 3]],
+        [name.length > 4, () =>
+          [A.div, 1, 2, 3]],
+      ],
+    ],
     [ConditionalComp, {
       text: `Smart one: ${name}`,
       shouldShow: () =>

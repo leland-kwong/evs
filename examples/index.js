@@ -7,6 +7,7 @@ import {
   nativeElements,
   createElement,
 } from './prototype.ldom';
+import * as styles from './styles';
 
 const makeTodoId = () =>
   Math.random().toString(32).slice(2);
@@ -212,6 +213,12 @@ function benchFn(
       ...options,
     });
 
+  const SetBenchOptions = (options) =>
+    ({
+      type: 'SetBenchOptions',
+      options,
+    });
+
   const RunMeasureIteration = () =>
     ({
       type: 'MeasureIteration',
@@ -226,6 +233,10 @@ function benchFn(
   const model = atom({
     name: 'Leland',
     logAction: false,
+    benchOptions: {
+      size: 1,
+      numTests: 1,
+    },
   });
 
   const DevDashboard = ({ logAction = false }) => {
@@ -254,13 +265,41 @@ function benchFn(
       const runBench = () =>
         evs.notify(
           scope,
-          RunBench({ size: 200, numTests: 5 }),
+          RunBench(data.benchOptions),
         );
+
+      const setBenchOptions = (options) =>
+        evs.notify(
+          scope,
+          SetBenchOptions(options),
+        );
+
       const btnRunBench = (
         [A.button,
           { onClick: runBench },
           'create vnodes',
         ]);
+
+      const BenchOptionCtrl = ({ fieldName, state }) =>
+        (
+          [A.label, { style: { display: 'block' } },
+            fieldName,
+            [A.input, { type: 'number',
+                        value: state[fieldName],
+                        onChange: (ev) => {
+                          setBenchOptions({
+                            [fieldName]: Math.max(1,
+                              Number(ev.currentTarget.value)),
+                          });
+                        } }]]);
+
+      const benchOptions = (
+        [A.div, { class: styles.Section },
+          [BenchOptionCtrl,
+            { fieldName: 'size', state: data.benchOptions }],
+          [BenchOptionCtrl,
+            { fieldName: 'numTests', state: data.benchOptions }]]
+      );
 
       const measureIteration = scope.call(
         RunMeasureIteration,
@@ -275,6 +314,7 @@ function benchFn(
         [A.div,
           [A.h2, 'Perf testing'],
           btnRunBench,
+          benchOptions,
           btnMeasureIteration,
         ]
       );
@@ -305,6 +345,13 @@ function benchFn(
     case 'SetName': {
       const { name } = action;
       return { ...state, name };
+    }
+
+    case 'SetBenchOptions': {
+      const { options } = action;
+      return { ...state,
+               benchOptions: { ...state.benchOptions,
+                               ...options } };
     }
 
     case '@VdomTestInit':
