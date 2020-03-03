@@ -195,7 +195,7 @@ const createVnode = (tagName, props) => {
   const childArray = !isArray(children) ? [children] : children;
   const hasNestedCollections = childArray.find(isArray);
   const flattendChildren = hasNestedCollections
-    ? childArray.flat()
+    ? childArray.flat(Infinity)
     : childArray;
   const isComment = tagName === '!';
 
