@@ -12,6 +12,7 @@ import { isArray, isFunc,
   setValue,
   identity } from '../utils';
 import { emptyObj, emptyArr } from '../../constants';
+import * as valueTypes from './value-types';
 
 const vnodeKeyTypes = {
   string: true,
@@ -205,7 +206,8 @@ const processLisp = (value, path) => {
   }
 
   const f = getLispFunc(value);
-  const argProcessor = f.isVnodeFactory
+  const argProcessor = f.type
+    === valueTypes.nativeElement
     // only eagerly process vnode functions
     ? processLisp : identity;
   const props = parseProps(
@@ -281,8 +283,8 @@ const defineElement = (tagName) => {
     name: {
       value: tagName,
     },
-    isVnodeFactory: {
-      value: true,
+    type: {
+      value: valueTypes.nativeElement,
     },
   });
 };
