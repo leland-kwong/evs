@@ -55,7 +55,7 @@ describe('createElement', () => {
             .children[0]
             .children[0].props.$$refPath,
         ).toEqual(
-          [seedPath, 0, 0, 0],
+          [seedPath, 0, 0],
         );
 
         expect(
@@ -63,7 +63,7 @@ describe('createElement', () => {
             .children[0]
             .children[1].props.$$refPath,
         ).toEqual(
-          [seedPath, 0, 0, 1],
+          [seedPath, 0, 1],
         );
       });
     });
@@ -152,6 +152,24 @@ describe('createElement', () => {
             [Component, { value: 3, key: 2 }],
           ], seedPath),
         );
+    });
+
+    test('auto-expand nested lists', () => {
+      const seedPath = 'nestedList';
+      const nestedList = createElement(
+        [A.div, 1, [2, 3, [4]]],
+        seedPath,
+      );
+
+      expect(
+        nestedList
+          .children,
+      ).toEqual(
+        createElement(
+          [A.div, 1, 2, 3, 4],
+          seedPath,
+        ).children,
+      );
     });
   });
 });
