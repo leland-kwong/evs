@@ -145,21 +145,21 @@ function benchFn(
   const scope = evs.createScope('@vdomTest');
 
   const BenchCreateElement = ({ size = 1000, numTests = 5 }) => {
-    const rootId = Math.random();
+    const seedPath = Math.random().toString(32);
     const range = Array(size).fill(0);
     const test = () => {
       range.forEach(() => {
         createElement(
           [Hello, { name: 'foo',
                     scope }],
-          rootId,
+          seedPath,
         );
       });
     };
 
     const vNode = createElement(
       [Hello, { name: 'foo', scope }],
-      rootId,
+      seedPath,
     );
     console.log(vNode);
 
@@ -234,8 +234,8 @@ function benchFn(
     name: 'Leland',
     logAction: false,
     benchOptions: {
-      size: 1,
-      numTests: 1,
+      size: 200,
+      numTests: 3,
     },
   });
 
