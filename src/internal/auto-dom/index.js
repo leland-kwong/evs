@@ -217,12 +217,12 @@ const processLisp = (value, path) => {
   ) {
     if (isVnode(nextValue)) {
       /**
-       * Automatically add key to vnode in case it
+       * Automatically transfer key to vnode in case it
        * wasn't passed through explicitly.
        */
       nextValue.key = key;
-    // pass key through to next component function
     } else {
+      // pass key through to next function
       nextValue.$$keyPassthrough = key;
     }
   }
