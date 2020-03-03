@@ -78,7 +78,7 @@ const smartComponentHooks = {
 };
 
 const WithModel = (config) => {
-  const { $$refPath, $$refId } = config;
+  const { $$refId } = config;
   const modelRefKey = $$refId;
   const { render, props, model } = config;
   const modelRef = modelsByRefId.get(modelRefKey) || model();
@@ -96,7 +96,7 @@ const WithModel = (config) => {
       onDestroy(vnode, renderConfig),
   };
   const renderValue = createElement(
-    [render, renderConfig], $$refPath,
+    [render, renderConfig], $$refId,
   );
 
   modelsByRefId.set(modelRefKey, modelRef);

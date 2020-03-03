@@ -45,6 +45,9 @@ const patch = snabbdomInit([
   snabbdomProps,
 ]);
 
+const addToRefId = (currentPath, location) =>
+  `${currentPath}.${location}`;
+
 /**
  * Makes a new list of arguments. This also
  * gives us the safety to mutate it later without
@@ -66,8 +69,9 @@ const prepareArgs = (
   while (i < length) {
     const arg = lisp[i];
     const argPosition = i - startFrom;
+    const refId = addToRefId(path, argPosition);
     const evaluated = callback(
-      arg, [...path, argPosition],
+      arg, refId,
     );
 
     args[argPosition] = evaluated;
@@ -150,46 +154,25 @@ const parseProps = (value = [], argProcessor, path) => {
     );
   }
 
-  if (props.key) {
+  const refId = props.key
     /**
-     * Set the last position in the path to the key
-     * instead of the item's index. This is necessary
-     * for collections where items can have their
-     * positions change but we want to guarantee the
-     * ref path.
+     * Replace last position of id with key so that
+     * the id remains consistent when an element's
+     * position changes amongst its siblings.
      */
-    path.splice(-1, 1, props.key);
-  }
+    ? addToRefId(
+      path.slice(0, path.lastIndexOf('.')),
+      props.key,
+    )
+    : path;
 
   const baseProps = {
     $hook: {},
     children,
-    $$refId: path.join('.'),
-    $$refPath: path,
+    $$refId: refId,
   };
 
   return transformProps(baseProps, props);
-};
-
-/**
- * Converts a tree path into array form, so
- * if we received something like:
- *
- * `'uuid.1.2.5.0'` it would become an array
- * `['uuid', 1, 2, 5, 0]`
- *
- * @param {String | Array} value
- * @returns {Array}
- */
-const parsePath = (value) => {
-  if (isArray(value)) {
-    return value;
-  }
-  // transforms the id back into the original path
-  return String(value).split('.').map((v) => {
-    const maybeNum = Number(v);
-    return !Number.isNaN(maybeNum) ? maybeNum : v;
-  });
 };
 
 const getLispFunc = (lisp) =>
@@ -200,7 +183,8 @@ const getLispFunc = (lisp) =>
  * as lisp data structures.
  */
 const processLisp = (value, nodePath) => {
-  const pathArray = parsePath(nodePath);
+  const pathArray = nodePath;
+  // const pathArray = parsePath(nodePath);
   const isList = isArray(value);
   /**
    * lisp structure is:
@@ -211,8 +195,10 @@ const processLisp = (value, nodePath) => {
 
   if (!isLispLike) {
     if (isList) {
-      return value.map((v, i) =>
-        processLisp(v, [...pathArray, i]));
+      return value.map((v, i) => {
+        const refId = addToRefId(nodePath, i);
+        return processLisp(v, refId);
+      });
     }
 
     return value;
@@ -238,25 +224,13 @@ const processLisp = (value, nodePath) => {
     }
   }
 
-  return processLisp(nextValue, props.$$refPath);
+  return processLisp(nextValue, props.$$refId);
 };
 
 const validateSeedPath = (seedPath) => {
-  if (!vnodeKeyTypes[typeof seedPath]
-    && !isArray(seedPath)
-  ) {
+  if (!vnodeKeyTypes[typeof seedPath]) {
     throw new Error(string([
-      '[createElement] `seedPath` must be a string or ',
-      'an existing path from a vnode',
-    ]));
-  }
-
-  if (typeof seedPath === 'string'
-    && !keyRegex.test(seedPath)
-  ) {
-    throw new Error(string([
-      '[createElement] `seedPath` must satisfy',
-      `${keyRegex}. Received: ${seedPath}`,
+      '[createElement] `seedPath` must be a string or number',
     ]));
   }
 };
@@ -338,7 +312,7 @@ const renderToDomNode = (
     : domNode.oldVnode;
   const fromNode = oldVnode || domNode;
   const path = oldVnode
-    ? oldVnode.props.$$refPath
+    ? oldVnode.props.$$refId
     : seedPath || generateSeedPath();
   const toNode = createElement(component, path);
 
