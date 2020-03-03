@@ -14,7 +14,6 @@ import { emptyObj, emptyArr } from '../../constants';
 
 const vnodeKeyTypes = {
   string: true,
-  number: true,
 };
 
 const keyRegex = /^[a-zA-Z0-9-_@]*$/;
@@ -154,6 +153,7 @@ const parseProps = (value = [], argProcessor, path) => {
     );
   }
 
+  const lastDotIndex = path.lastIndexOf('.');
   const refId = props.key
     /**
      * Replace last position of id with key so that
@@ -161,7 +161,8 @@ const parseProps = (value = [], argProcessor, path) => {
      * position changes amongst its siblings.
      */
     ? addToRefId(
-      path.slice(0, path.lastIndexOf('.')),
+      path.slice(0, lastDotIndex !== -1
+        ? lastDotIndex : path.length),
       props.key,
     )
     : path;
@@ -182,9 +183,7 @@ const getLispFunc = (lisp) =>
  * Recursively processes a tree of Arrays
  * as lisp data structures.
  */
-const processLisp = (value, nodePath) => {
-  const pathArray = nodePath;
-  // const pathArray = parsePath(nodePath);
+const processLisp = (value, path) => {
   const isList = isArray(value);
   /**
    * lisp structure is:
@@ -196,7 +195,7 @@ const processLisp = (value, nodePath) => {
   if (!isLispLike) {
     if (isList) {
       return value.map((v, i) => {
-        const refId = addToRefId(nodePath, i);
+        const refId = addToRefId(path, i);
         return processLisp(v, refId);
       });
     }
@@ -205,13 +204,17 @@ const processLisp = (value, nodePath) => {
   }
 
   const f = getLispFunc(value);
-  const props = parseProps(value, processLisp, pathArray);
-  const nextValue = f(props, pathArray);
+  const props = parseProps(
+    value, processLisp, path,
+  );
+  const nextValue = f(props, path);
   const key = validateKey(
     props.key || value.$$keyPassthrough,
   );
 
-  if (isDef(key) && !ignoredValues.has(nextValue)) {
+  if (isDef(key)
+    && !ignoredValues.has(nextValue)
+  ) {
     if (isVnode(nextValue)) {
       /**
        * Automatically add key to vnode in case it
@@ -230,7 +233,7 @@ const processLisp = (value, nodePath) => {
 const validateSeedPath = (seedPath) => {
   if (!vnodeKeyTypes[typeof seedPath]) {
     throw new Error(string([
-      '[createElement] `seedPath` must be a string or number',
+      '[createElement] `seedPath` must be a string',
     ]));
   }
 };

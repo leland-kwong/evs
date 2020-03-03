@@ -17,7 +17,7 @@ describe('createElement', () => {
       expect(() => {
         createElement(
           [A.div, 1],
-          'foo.bar',
+          { foo: 'bar' },
         );
       }).toThrow();
     });
@@ -34,8 +34,8 @@ describe('createElement', () => {
       );
 
       expect(
-        element.props.$$refPath,
-      ).toEqual([seedPath]);
+        element.props.$$refId,
+      ).toEqual(seedPath);
     });
 
     describe('deep ref id', () => {
@@ -53,17 +53,17 @@ describe('createElement', () => {
         expect(
           elementDeep
             .children[0]
-            .children[0].props.$$refPath,
+            .children[0].props.$$refId,
         ).toEqual(
-          [seedPath, 0, 0],
+          [seedPath, 0, 0].join('.'),
         );
 
         expect(
           elementDeep
             .children[0]
-            .children[1].props.$$refPath,
+            .children[1].props.$$refId,
         ).toEqual(
-          [seedPath, 0, 1],
+          [seedPath, 0, 1].join('.'),
         );
       });
     });
@@ -81,7 +81,7 @@ describe('createElement', () => {
     test('key replaces last part of refId', () => {
       expect(
         element.props.children[0].props.$$refId,
-      ).toBe([key, 0].join('.'));
+      ).toBe([seedPath, key, 0].join('.'));
     });
   });
 
@@ -126,30 +126,30 @@ describe('createElement', () => {
       const seedPath = 'withKey';
       const list = createElement(
         [1, 2].map((value) =>
-          [Component, { value, key: value }]),
+          [Component, { value, key: String(value) }]),
         seedPath,
       );
 
       expect(list)
         .toEqual(
           createElement([
-            [Component, { value: 1, key: 1 }],
-            [Component, { value: 2, key: 2 }],
+            [Component, { value: 1, key: String(1) }],
+            [Component, { value: 2, key: String(2) }],
           ], seedPath),
         );
 
       const outOfOrderList = createElement(
         [2, 1, 3].map((value, i) =>
-          [Component, { value, key: i }]),
+          [Component, { value, key: String(i) }]),
         seedPath,
       );
 
       expect(outOfOrderList)
         .toEqual(
           createElement([
-            [Component, { value: 2, key: 0 }],
-            [Component, { value: 1, key: 1 }],
-            [Component, { value: 3, key: 2 }],
+            [Component, { value: 2, key: String(0) }],
+            [Component, { value: 1, key: String(1) }],
+            [Component, { value: 3, key: String(2) }],
           ], seedPath),
         );
     });
