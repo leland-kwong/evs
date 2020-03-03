@@ -9,6 +9,7 @@ import { string } from '../string';
 import { isArray, isFunc,
   isDef,
   stringifyValueForLogging } from '../utils';
+import { emptyObj, emptyArr } from '../../constants';
 
 const vnodeKeyTypes = {
   string: true,
@@ -50,7 +51,7 @@ const patch = snabbdomInit([
  * @returns {Array}
  */
 const prepareArgs = (
-  lisp = [],
+  lisp = emptyArr,
   callback,
   path = [0],
 ) => {
@@ -87,7 +88,7 @@ const parseProps = (value = [], argProcessor, path) => {
     && !isVnode(firstArg);
   const props = hasProps
     // remove the first argument
-    ? args.shift() : {};
+    ? args.shift() : emptyObj;
   const childrenLength = args.length;
   const children = childrenLength > 0
     ? args
@@ -302,29 +303,8 @@ const renderToDomNode = (
   toNode.elm.oldVnode = toNode;
 };
 
-/*
- * TODO:
- * instead of making a new vnode, we should just call `parseProps`
- * then extend those props and return a new lisp element. This also
- * follows with our laziness theme and omits the unecessary extra
- * step of having to call `createElement` to create a vnode first.
- * The new cloning logic becomes:
- *
- * ```js
- * const lazyElement = [A.div, myProps, child1, child2];
- * const elementCtor = lazyElement[0]
- * const props = parseProps(lazyElement);
- * const newProps = {};
- * const newChildren = [];
- * const newElement = [
- *  elementCtor,
- *  {...props, ...newProps},
- *  newChildren
- * ];
- * ```
- */
 /**
- * Extend an element factory, returning a new factory.
+ * Extend an element, by assign new props.
  * New children will replace existing children.
  */
 const cloneElement = (...args) => {

@@ -12,3 +12,7 @@ export const domNodeTypes = {
   comment: 8,
   element: 1,
 };
+
+export const emptyObj = Object.freeze({});
+
+export const emptyArr = Object.freeze([]);

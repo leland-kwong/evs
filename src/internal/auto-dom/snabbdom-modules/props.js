@@ -10,8 +10,8 @@ Object.defineProperty(exports, '__esModule', { value: true });
 const { domNodeTypes } = require('../../../constants');
 const hookType = require('./hook-type');
 const { call, isFunc } = require('../../utils');
+const { emptyObj, emptyArr } = require('../../../constants');
 
-const emptyObject = Object.freeze({});
 const hasOwn = Object.prototype.hasOwnProperty;
 
 const execHook = (vnode, hookConfig) => {
@@ -20,16 +20,16 @@ const execHook = (vnode, hookConfig) => {
     return;
   }
 
-  const [hookFn, hookArg] = hookConfig || [];
+  const [hookFn, hookArg] = hookConfig || emptyArr;
   call([hookFn, vnode, hookArg]);
 };
 
 function updateProps(hook, oldVnode, vnode) {
   const { elm } = vnode;
   const {
-    props: oldProps = emptyObject,
+    props: oldProps = emptyObj,
   } = oldVnode;
-  const { props = emptyObject } = vnode;
+  const { props = emptyObj } = vnode;
   const { handleProp } = vnode.data;
 
   execHook(vnode, props[hook]);
@@ -72,7 +72,7 @@ function updateProps(hook, oldVnode, vnode) {
 }
 
 function onDestroy(hook, oldVnode) {
-  const { props = {} } = oldVnode;
+  const { props = emptyObj } = oldVnode;
 
   execHook(oldVnode, props[hook]);
 }

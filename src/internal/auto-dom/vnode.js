@@ -4,6 +4,7 @@ import { invalidComponentMsg } from './invalid-component-msg';
 import { string } from '../string';
 import { isArray, isFunc,
   setValue, stringifyValueForLogging } from '../utils';
+import { emptyObj, emptyArr } from '../../constants';
 
 const vnodeType = Symbol('@vnode');
 
@@ -48,7 +49,7 @@ const handleProp = Object.freeze({
     // remove old styles
     if (isDifferentDomNode) {
       const hasOwn = Object.prototype.hasOwnProperty;
-      Object.keys(oldStyle || {}).forEach((k) => {
+      Object.keys(oldStyle || emptyObj).forEach((k) => {
         if (!hasOwn.call(newStyleObj, k)) {
           setValue(domNode.style, k, null);
         }
@@ -187,10 +188,10 @@ function coerceToVnode(newChildren, value) {
 
 const createVnode = (tagName, props) => {
   const {
-    children = [],
+    children = emptyArr,
     key,
     // special snabbdom hooks
-    $hook: elementHooks = {},
+    $hook: elementHooks = emptyObj,
   } = props;
   const childArray = !isArray(children) ? [children] : children;
   const hasNestedCollections = childArray.find(isArray);
@@ -216,7 +217,7 @@ const createVnode = (tagName, props) => {
       ? flattendChildren.join('')
       : undefined,
     children: isComment
-      ? []
+      ? emptyArr
       : flattendChildren
         .reduce(coerceToVnode, []),
     [vnodeType]: true,
