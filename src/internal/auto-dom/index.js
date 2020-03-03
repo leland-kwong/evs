@@ -8,7 +8,8 @@ import {
 import { string } from '../string';
 import { isArray, isFunc,
   isDef,
-  stringifyValueForLogging } from '../utils';
+  stringifyValueForLogging,
+  setValue } from '../utils';
 import { emptyObj, emptyArr } from '../../constants';
 
 const vnodeKeyTypes = {
@@ -76,6 +77,53 @@ const prepareArgs = (
   return args;
 };
 
+const propTransformer = {
+  children(props, _, childrenFromArgs) {
+    setValue(props, 'children',
+      props.children
+      || childrenFromArgs);
+  },
+  hookInit(props, key, value) {
+    setValue(props.$hook, 'init', value);
+  },
+  hookCreate(props, key, value) {
+    setValue(props.$hook, 'create', value);
+  },
+  hookUpdate(props, key, value) {
+    setValue(props.$hook, 'update', value);
+  },
+  hookDestroy(props, key, value) {
+    setValue(props.$hook, 'destroy', value);
+  },
+};
+
+/**
+ * Mutates the source by applying transformations
+ * and remapping as necessary
+ */
+const transformProps = (
+  source, config,
+) => {
+  const src = source;
+  const keys = Object.keys(config);
+
+  let i = 0;
+  while (i < keys.length) {
+    const k = keys[i];
+    const v = config[k];
+    const transformer = propTransformer[k];
+
+    if (transformer) {
+      transformer(src, k, v);
+    } else {
+      src[k] = v;
+    }
+    i += 1;
+  }
+
+  return src;
+};
+
 /**
  * @param {Array|arguments} value
  * @param {Function} argProcessor
@@ -113,19 +161,14 @@ const parseProps = (value = [], argProcessor, path) => {
     path.splice(-1, 1, props.key);
   }
 
-  /**
-   * we can validate/sanitize the props
-   */
-  // don't mutate the original
-  return { ...props,
-           /**
-            * @important
-            * This is necessary for stateful components
-            * to use as a key for external data sources.
-            */
-           $$refId: path.join('.'),
-           $$refPath: path,
-           children };
+  const baseProps = {
+    $hook: {},
+    children,
+    $$refId: path.join('.'),
+    $$refPath: path,
+  };
+
+  return transformProps(baseProps, props);
 };
 
 /**
@@ -316,16 +359,15 @@ const cloneElement = (...args) => {
     );
   }
 
-  /*
-   * TODO:
-   * Need to figure out an idiomatic way to also
-   * combine the hooks
-   */
   const { sel } = element;
   const props = config
-    ? { ...element.props,
-        ...config }
+    ? transformProps(
+      { ...element.props },
+      config,
+    )
+    // keep original
     : element.props;
+
   const childrenLength = args.length - 2;
 
   if (childrenLength === 1) {

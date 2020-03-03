@@ -3,26 +3,15 @@
 Object.defineProperty(exports, '__esModule', { value: true });
 
 /**
- * We can automatically apply an attribute if the
+ * We can automatically do setAttribute if the
  * property name to set does not exist on the dom node.
  */
 
 const { domNodeTypes } = require('../../../constants');
 const hookType = require('./hook-type');
-const { call, isFunc } = require('../../utils');
-const { emptyObj, emptyArr } = require('../../../constants');
+const { emptyObj } = require('../../../constants');
 
 const hasOwn = Object.prototype.hasOwnProperty;
-
-const execHook = (vnode, hookConfig) => {
-  if (isFunc(hookConfig)) {
-    hookConfig(vnode);
-    return;
-  }
-
-  const [hookFn, hookArg] = hookConfig || emptyArr;
-  call([hookFn, vnode, hookArg]);
-};
 
 function updateProps(hook, oldVnode, vnode) {
   const { elm } = vnode;
@@ -31,8 +20,6 @@ function updateProps(hook, oldVnode, vnode) {
   } = oldVnode;
   const { props = emptyObj } = vnode;
   const { handleProp } = vnode.data;
-
-  execHook(vnode, props[hook]);
 
   if (domNodeTypes.comment === elm.nodeType) {
     return;
@@ -58,23 +45,19 @@ function updateProps(hook, oldVnode, vnode) {
     }
   }
 
-  const cleanupOldProps = elm !== oldVnode.elm;
-  if (cleanupOldProps) {
-    for (const key in oldProps) {
-      const shouldRemove = !hasOwn
-        .call(props, key);
+  const { $$refId: id1 } = oldVnode;
+  const { $$refId: id2 } = vnode;
+  const isNewReference = id1 !== id2;
 
-      if (shouldRemove) {
+  /** TODO: naive implementation, needs testing */
+  // cleanup old props
+  if (isNewReference) {
+    for (const key in oldProps) {
+      if (!hasOwn(props[key])) {
         delete elm[key];
       }
     }
   }
-}
-
-function onDestroy(hook, oldVnode) {
-  const { props = emptyObj } = oldVnode;
-
-  execHook(oldVnode, props[hook]);
 }
 
 exports.propsModule = {
@@ -85,14 +68,14 @@ exports.propsModule = {
    * property to make sure the state of the control
    * is always a representation of the the render.
    */
+  // init: (oldVnode, vnode) => {
+  //   updateProps('onInit', oldVnode, vnode);
+  // },
   create: (oldVnode, vnode) => {
     updateProps(hookType.create, oldVnode, vnode);
   },
   update: (oldVnode, vnode) => {
     updateProps(hookType.update, oldVnode, vnode);
-  },
-  destroy: (oldVnode, vnode) => {
-    onDestroy(hookType.destroy, oldVnode, vnode);
   },
 };
 
