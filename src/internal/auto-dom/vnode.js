@@ -5,16 +5,15 @@ import { string } from '../string';
 import { isArray, isFunc,
   setValue, stringifyValueForLogging } from '../utils';
 import { emptyObj, emptyArr } from '../../constants';
-
-const vnodeType = Symbol('@vnode');
+import * as valueTypes from './value-types';
 
 const getDomNode = (vnode) =>
   vnode.elm;
 
 // vnode utils
-const isVnode = (node) =>
-  (node
-    ? node[vnodeType]
+const isVnode = (value) =>
+  (value
+    ? value.type === valueTypes.vnode
     : false);
 
 const remappedEventTypes = {
@@ -144,7 +143,7 @@ const validateValue = (value) => {
 function createTextVnode(value) {
   return {
     text: value,
-    [vnodeType]: true,
+    type: valueTypes.vnode,
   };
 }
 
@@ -220,12 +219,12 @@ const createVnode = (tagName, props) => {
       ? emptyArr
       : flattendChildren
         .reduce(coerceToVnode, []),
-    [vnodeType]: true,
+    type: valueTypes.vnode,
   };
 };
 
 export {
   createVnode, createTextVnode, isVnode,
-  vnodeType, ignoredValues, primitiveTypes,
+  ignoredValues, primitiveTypes,
   getDomNode,
 };

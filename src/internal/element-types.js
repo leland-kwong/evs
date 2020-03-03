@@ -10,6 +10,7 @@ export const elementTypes = {
   h4: true,
   h5: true,
   h6: true,
+  hr: true,
   input: true,
   label: true,
   li: true,
