@@ -7,7 +7,6 @@ import {
 } from './vnode';
 import { string } from '../string';
 import { isArray, isFunc,
-  identity,
   isDef,
   stringifyValueForLogging } from '../utils';
 
@@ -52,7 +51,7 @@ const patch = snabbdomInit([
  */
 const prepareArgs = (
   lisp = [],
-  callback = null,
+  callback,
   path = [0],
 ) => {
   // skip first value since it is the lisp function
@@ -65,9 +64,9 @@ const prepareArgs = (
   while (i < length) {
     const arg = lisp[i];
     const argPosition = i - startFrom;
-    const evaluated = callback
-      ? callback(arg, [...path, argPosition])
-      : arg;
+    const evaluated = callback(
+      arg, [...path, argPosition],
+    );
 
     args[argPosition] = evaluated;
     i += 1;
@@ -89,11 +88,18 @@ const parseProps = (value = [], argProcessor, path) => {
   const props = hasProps
     // remove the first argument
     ? args.shift() : {};
-  const { children: childrenFromProps } = props;
-  const children = args;
-  const combinedChildren = childrenFromProps
-    ? [...childrenFromProps, ...children]
-    : children;
+  const childrenLength = args.length;
+  const children = childrenLength > 0
+    ? args
+    : props.children;
+  const hasDuplicateChildrenProps = childrenLength > 0
+    && props.children;
+
+  if (hasDuplicateChildrenProps) {
+    throw new Error(
+      'We may not have both a children prop and children arguments',
+    );
+  }
 
   if (props.key) {
     /**
@@ -118,7 +124,7 @@ const parseProps = (value = [], argProcessor, path) => {
             */
            $$refId: path.join('.'),
            $$refPath: path,
-           children: combinedChildren };
+           children };
 };
 
 /**
@@ -169,10 +175,7 @@ const processLisp = (value, nodePath) => {
   }
 
   const f = getLispFunc(value);
-  const argProcessor = f.isVnodeFactory
-    // only eagerly evaluate when creating vnode
-    ? processLisp : null;
-  const props = parseProps(value, argProcessor, pathArray);
+  const props = parseProps(value, processLisp, pathArray);
   const nextValue = f(props, pathArray);
   const key = validateKey(
     props.key || value.$$keyPassthrough,
@@ -191,7 +194,7 @@ const processLisp = (value, nodePath) => {
     }
   }
 
-  return processLisp(nextValue, pathArray);
+  return processLisp(nextValue, props.$$refPath);
 };
 
 const validateSeedPath = (seedPath) => {
@@ -271,16 +274,10 @@ const nativeElements = Object.keys(elementTypes)
 // the `!` symbol is a comment in snabbdom
 nativeElements.comment = defineElement('!');
 
-let seedPathCount = 0;
-
-const generateSeedPath = () => {
-  seedPathCount += 1;
-  const randString = Math.random()
+const generateSeedPath = () =>
+  Math.random()
     .toString(32)
-    .slice(2, 5);
-
-  return [seedPathCount, randString].join('');
-};
+    .slice(2, 6);
 
 /*
  * TODO:
