@@ -55,7 +55,7 @@ describe('createElement', () => {
             .children[0]
             .children[0].props.$$refId,
         ).toEqual(
-          [seedPath, 0, 0].join('.'),
+          [seedPath, 0, 0, 0].join('.'),
         );
 
         expect(
@@ -63,7 +63,7 @@ describe('createElement', () => {
             .children[0]
             .children[1].props.$$refId,
         ).toEqual(
-          [seedPath, 0, 1].join('.'),
+          [seedPath, 0, 0, 1].join('.'),
         );
       });
     });

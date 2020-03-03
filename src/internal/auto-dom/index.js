@@ -9,7 +9,8 @@ import { string } from '../string';
 import { isArray, isFunc,
   isDef,
   stringifyValueForLogging,
-  setValue } from '../utils';
+  setValue,
+  identity } from '../utils';
 import { emptyObj, emptyArr } from '../../constants';
 
 const vnodeKeyTypes = {
@@ -204,8 +205,11 @@ const processLisp = (value, path) => {
   }
 
   const f = getLispFunc(value);
+  const argProcessor = f.isVnodeFactory
+    // only eagerly process vnode functions
+    ? processLisp : identity;
   const props = parseProps(
-    value, processLisp, path,
+    value, argProcessor, path,
   );
   const nextValue = f(props, path);
   const key = validateKey(
