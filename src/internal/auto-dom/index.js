@@ -316,21 +316,34 @@ const generateSeedPath = () =>
  * so we don't require a single parent vnode.
  */
 const renderToDomNode = (
-  domNode,
+  domNodeOrComponent,
   component,
   seedPath,
 ) => {
-  const oldVnode = isType(domNode, valueTypes.vnode)
-    ? domNode
-    : domNode.oldVnode;
-  const fromNode = oldVnode || domNode;
+  const d = domNodeOrComponent;
+  const oldVnode = isType(d, valueTypes.vnode)
+    ? d : d.$$oldVnode;
+  const fromNode = oldVnode || d;
   const path = oldVnode
     ? oldVnode.props.$$refId
     : seedPath || generateSeedPath();
   const toNode = createElement(component, path);
 
   patch(fromNode, toNode);
-  toNode.elm.oldVnode = toNode;
+  /*
+   * TODO:
+   * Refactor so that we don't need to store vnode
+   * reference on the dom node directly, and instead
+   * store it in our own cache.
+   */
+  /**
+   * Add vnode reference on dom node for convenience so
+   * you can just render with the dom node as the fromNode
+   * every time.
+   */
+  toNode.elm.$$oldVnode = toNode;
+
+  return toNode;
 };
 
 /**
