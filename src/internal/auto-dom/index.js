@@ -88,16 +88,16 @@ const propTransformer = {
       || childrenFromArgs);
   },
   hookInit(props, key, value) {
-    setValue(props.$hook, 'init', value);
+    setValue(props.$$hook, 'init', value);
   },
   hookCreate(props, key, value) {
-    setValue(props.$hook, 'create', value);
+    setValue(props.$$hook, 'create', value);
   },
   hookUpdate(props, key, value) {
-    setValue(props.$hook, 'update', value);
+    setValue(props.$$hook, 'update', value);
   },
   hookDestroy(props, key, value) {
-    setValue(props.$hook, 'destroy', value);
+    setValue(props.$$hook, 'destroy', value);
   },
 };
 
@@ -170,8 +170,8 @@ const parseProps = (value = [], argProcessor, path) => {
     : path;
 
   const baseProps = {
-    $hook: {},
     children,
+    $$hook: {},
     $$refId: refId,
   };
 

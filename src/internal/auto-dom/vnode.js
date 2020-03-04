@@ -186,7 +186,7 @@ const createVnode = (tagName, props) => {
     children = emptyArr,
     key,
     // special snabbdom hooks
-    $hook: elementHooks = emptyObj,
+    $$hook: elementHooks = emptyObj,
   } = props;
   const childArray = !isArray(children) ? [children] : children;
   const hasNestedCollections = childArray.find(isArray);
