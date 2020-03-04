@@ -129,12 +129,11 @@ const Title = (
 const ItemList = ({ items }) =>
   items.map(({ key, value, onTodoChange }) => {
     const { text, completed } = value;
-    const itemStyle = '';
-    // css`
-    //   input {
-    //     text-decoration: ${completed ? 'line-through' : null};
-    //   }
-    // `;
+    const itemStyle = css`
+      input {
+        text-decoration: ${completed ? 'line-through' : null};
+      }
+    `;
     const toggleCompleted = (e) => {
       const changes = { completed: e.target.checked };
       onTodoChange(
