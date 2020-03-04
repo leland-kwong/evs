@@ -239,21 +239,21 @@ const TodoList = ({ items = [] }) =>
       [TodoItem, props])]);
 
 const NewTodo = ({ onNewTodoCreate, onNewTodoChange, newTodo }) => {
-  const newTodoText = (
+  const newTodoField = (
     [A.input, { placeholder: 'what needs to be done?',
                 value: newTodo.text,
                 onInput: (e) => {
                   onNewTodoChange({ text: inputValue(e) });
                 } }]);
+  const submitTodo = (e) => {
+    e.preventDefault();
+    const key = uid();
+    onNewTodoCreate({ key });
+  };
 
   return (
-    [A.form,
-      { onSubmit: (e) => {
-        e.preventDefault();
-        const key = uid();
-        onNewTodoCreate({ key });
-      } },
-      newTodoText]);
+    [A.form, { onSubmit: submitTodo },
+      newTodoField]);
 };
 
 const SortOptions = ({ onSortChange }) => {
