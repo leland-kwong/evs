@@ -142,13 +142,13 @@ const smartComponentHooks = {
   },
 };
 
-const WithModel = (config) => {
-  const { $$refId } = config;
+const WithHooks = (config) => {
+  const { $$refId, key, render,
+          props, model } = config;
   const modelRefKey = $$refId;
-  const { render, props, model } = config;
   const modelRef = modelsByRefId.get(modelRefKey) || model();
   const renderConfig = {
-    render, props, model: modelRef, modelRefKey,
+    render, props, model: modelRef, modelRefKey, key,
   };
   const { onUpdate,
           onDestroy } = smartComponentHooks;
@@ -302,7 +302,7 @@ const Main = ({ model }) => {
 };
 
 const TodoApp = () =>
-  ([WithModel,
+  ([WithHooks,
     { props: {},
       model: todosModel,
       render: Main }]);
