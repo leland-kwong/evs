@@ -147,8 +147,8 @@ const parseProps = (value = [], argProcessor, path, prevKey) => {
     ? keyFromProps : prevKey);
   const refId = isDef(key)
     /**
-     * Replace last position of id with key so that
-     * the id remains consistent when an element's
+     * Replace last position of path with key so that
+     * the path remains consistent when an element's
      * position changes amongst its siblings.
      */
     ? addToRefId(
