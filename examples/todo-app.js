@@ -1,3 +1,4 @@
+import { css } from 'emotion';
 import * as atomicState from 'atomic-state';
 import { nativeElements as A,
   createElement,
@@ -11,15 +12,19 @@ const { atom, swap, read } = atomicState;
 const modelsByRefId = new Map();
 
 const smartComponentHooks = {
-  onUpdate: (renderVnode, config) => {
-    const { key } = renderVnode;
+  onUpdate: (initialVnode, config) => {
+    const { key, props: { $$refId } } = initialVnode;
     const { render, model, modelRefKey, props } = config;
+
+    let oldVnode = initialVnode;
+
     const renderComponent = () => {
-      renderToDomNode(
-        renderVnode,
+      oldVnode = renderToDomNode(
+        oldVnode,
         [render, { props,
                    key,
                    model }],
+        $$refId,
       );
     };
 
@@ -83,36 +88,53 @@ const WithModel = (config) => {
     return [A.span, rootConfig, renderValue];
   }
 
+  console.log('[todos update]');
+
   return cloneElement(
     renderValue, rootConfig,
   );
 };
 
+const uid = () =>
+  Math.random().toString(36).slice(2);
+
+const inputValue = (e) =>
+  e.target.value;
+
+const initialModel = {
+  newTodo: {
+    text: '',
+    completed: false,
+  },
+  items: Array(2).fill(0)
+    .reduce((itemsByKey, _, index) => {
+      const i = itemsByKey;
+      const key = uid();
+
+      i[key] = {
+        text: `item - ${index}`,
+        completed: false,
+      };
+
+      return i;
+    }, {}),
+};
+
 const todosModel = () =>
-  atom({
-    items: Array(4).fill(0)
-      .reduce((itemsByKey, _, key) => {
-        const i = itemsByKey;
-
-        i[`item-${key}`] = {
-          text: `foo${key}`,
-          completed: false,
-        };
-
-        return i;
-      }, {}),
-  });
+  atom(initialModel);
 
 const Title = (
   [A.h1, 'Todo App']);
 
-const TodoList = ({ items = [] }) => {
-  const root = A.ul;
-  const itemList = items.map(({ key, value, onTodoChange }) => {
+const ItemList = ({ items }) =>
+  items.map(({ key, value, onTodoChange }) => {
     const { text, completed } = value;
-    const itemStyle = {
-      textDecoration: completed ? 'line-through' : 'none',
-    };
+    const itemStyle = '';
+    // css`
+    //   input {
+    //     text-decoration: ${completed ? 'line-through' : null};
+    //   }
+    // `;
     const toggleCompleted = (e) => {
       const changes = { completed: e.target.checked };
       onTodoChange(
@@ -120,27 +142,52 @@ const TodoList = ({ items = [] }) => {
       );
     };
     const changeText = (e) => {
-      const changes = { text: e.target.value };
+      const changes = { text: inputValue(e) };
       onTodoChange(
         { key, changes },
       );
     };
+    const itemCompleted = (
+      [A.input, { type: 'checkbox',
+                  checked: completed,
+                  onChange: toggleCompleted }]);
+    const itemText = (
+      [A.input, { value: text,
+                  onInput: changeText }]);
 
     return (
-      [A.li, { key, style: itemStyle },
-        '{- item/completed -}',
-        [A.input, { type: 'checkbox',
-                    checked: completed,
-                    onChange: toggleCompleted }],
+      [A.li, { key, class: itemStyle },
+        itemCompleted,
         ' ',
-        '{- item/text -}',
-        [A.input, { value: text,
-                    onChange: changeText }]]);
+        itemText]);
   });
 
+const TodoList = ({ items = [] }) =>
+  ([A.ul,
+    { class: css`
+        ul, li {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+        }` },
+    [ItemList, { items }]]);
+
+const NewTodo = ({ onNewTodoCreate, onNewTodoChange, newTodo }) => {
+  const newTodoText = (
+    [A.input, { placeholder: 'what needs to be done?',
+                value: newTodo.text,
+                onInput: (e) => {
+                  onNewTodoChange({ text: inputValue(e) });
+                } }]);
+
   return (
-    [root,
-      itemList]);
+    [A.form,
+      { onSubmit: (e) => {
+        e.preventDefault();
+        const key = uid();
+        onNewTodoCreate({ key });
+      } },
+      newTodoText]);
 };
 
 const updateTodo = (state, { key, changes }) => {
@@ -157,14 +204,39 @@ const updateTodo = (state, { key, changes }) => {
   };
 };
 
+const updateNewTodo = (state, { text }) => {
+  const { newTodo } = state;
+
+  return {
+    ...state,
+    newTodo: {
+      ...newTodo,
+      text,
+    },
+  };
+};
+
+const addTodo = (state, { key }) => {
+  const { items, newTodo } = state;
+
+  return {
+    ...state,
+    newTodo: initialModel.newTodo,
+    items: {
+      ...items,
+      [key]: newTodo,
+    },
+  };
+};
+
 const Main = ({ model }) => {
   const onTodoChange = (payload) =>
     swap(model, updateTodo, payload);
-
-  const { items = {} } = read(model);
-
-  console.log(items);
-
+  const onNewTodoCreate = (payload) =>
+    swap(model, addTodo, payload);
+  const onNewTodoChange = (payload) =>
+    swap(model, updateNewTodo, payload);
+  const { items = {}, newTodo } = read(model);
   const itemsArray = Object.entries(items)
     .map(([key, value]) =>
       ({ key, value, onTodoChange }));
@@ -172,8 +244,14 @@ const Main = ({ model }) => {
   return (
     [A.div,
       [Title],
+      [NewTodo, {
+        onNewTodoCreate,
+        onNewTodoChange,
+        newTodo,
+      }],
       [TodoList,
-        { items: itemsArray }]]);
+        { items: itemsArray }],
+    ]);
 };
 
 const TodoApp = () =>
