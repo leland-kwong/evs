@@ -78,10 +78,10 @@ describe('createElement', () => {
       [Component, { key }], seedPath,
     );
 
-    test('key replaces last part of refId', () => {
+    test('key transfers through to vnode', () => {
       expect(
-        element.props.children[0].props.$$refId,
-      ).toBe([seedPath, key, 0].join('.'));
+        element.key,
+      ).toBe(key);
     });
   });
 

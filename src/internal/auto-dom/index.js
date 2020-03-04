@@ -223,6 +223,7 @@ const processLisp = (value, path, prevKey) => {
 
   let keyToTransfer;
   if (isDef(key)
+    // null, false, etc... can't have keys
     && !ignoredValues.has(nextValue)
   ) {
     if (isType(nextValue, valueTypes.vnode)) {

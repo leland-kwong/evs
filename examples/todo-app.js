@@ -95,8 +95,6 @@ const WithModel = (config) => {
     return [A.span, rootConfig, renderValue];
   }
 
-  console.log('[todos update]');
-
   return cloneElement(
     renderValue, rootConfig,
   );
@@ -113,7 +111,7 @@ const initialModel = {
     text: '',
     completed: false,
   },
-  items: Array(5).fill(0)
+  items: Array(6).fill(0)
     .reduce((itemsByKey, _, index) => {
       const i = itemsByKey;
       const key = uid();
@@ -125,6 +123,7 @@ const initialModel = {
 
       return i;
     }, {}),
+  sortBy: 'asc',
 };
 
 const todosModel = () =>
@@ -133,47 +132,47 @@ const todosModel = () =>
 const Title = (
   [A.h1, 'Todo App']);
 
-const ItemList = ({ items }) =>
-  items.map(({ key, value, onTodoChange }) => {
-    const { text, completed } = value;
-    const itemStyle = css`
-      ${cl.list}
+const TodoItem = ({ key, value, onTodoChange }) => {
+  const { text, completed } = value;
+  const itemStyle = css`
+    ${cl.list}
 
-      input {
-        text-decoration: ${completed ? 'line-through' : null};
-      }
-    `;
-    const toggleCompleted = (e) => {
-      const changes = { completed: e.target.checked };
-      onTodoChange(
-        { key, changes },
-      );
-    };
-    const changeText = (e) => {
-      const changes = { text: inputValue(e) };
-      onTodoChange(
-        { key, changes },
-      );
-    };
-    const itemCompleted = (
-      [A.input, { type: 'checkbox',
-                  checked: completed,
-                  onChange: toggleCompleted }]);
-    const itemText = (
-      [A.input, { value: text,
-                  onInput: changeText }]);
+    input {
+      text-decoration: ${completed ? 'line-through' : null};
+    }
+  `;
+  const toggleCompleted = (e) => {
+    const changes = { completed: e.target.checked };
+    onTodoChange(
+      { key, changes },
+    );
+  };
+  const changeText = (e) => {
+    const changes = { text: inputValue(e) };
+    onTodoChange(
+      { key, changes },
+    );
+  };
+  const itemCompleted = (
+    [A.input, { type: 'checkbox',
+                checked: completed,
+                onChange: toggleCompleted }]);
+  const itemText = (
+    [A.input, { value: text,
+                onInput: changeText }]);
 
-    return (
-      [A.li, { key, class: itemStyle },
-        itemCompleted,
-        ' ',
-        itemText]);
-  });
+  return (
+    [A.li, { class: itemStyle },
+      itemCompleted,
+      ' ',
+      itemText]);
+};
 
 const TodoList = ({ items = [] }) =>
-  ([A.ul,
-    { class: cl.list },
-    [ItemList, { items }]]);
+  ([A.ul, { class: cl.list },
+    items.map((props) =>
+      // doing it this way adds the key to the props
+      [TodoItem, props])]);
 
 const NewTodo = ({ onNewTodoCreate, onNewTodoChange, newTodo }) => {
   const newTodoText = (
