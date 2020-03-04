@@ -184,7 +184,7 @@ const getLispFunc = (lisp) =>
  * Recursively processes a tree of Arrays
  * as lisp data structures.
  */
-const processLisp = (value, path) => {
+const processLisp = (value, path, prevKey) => {
   const isList = isArray(value);
   /**
    * lisp structure is:
@@ -197,7 +197,7 @@ const processLisp = (value, path) => {
     if (isList) {
       return value.map((v, i) => {
         const refId = addToRefId(path, i);
-        return processLisp(v, refId);
+        return processLisp(v, refId, prevKey);
       });
     }
 
@@ -218,25 +218,26 @@ const processLisp = (value, path) => {
   );
   const nextValue = f(props, path);
   const key = validateKey(
-    props.key || value.$$keyPassthrough,
+    props.key || prevKey,
   );
 
+  let keyToTransfer;
   if (isDef(key)
     && !ignoredValues.has(nextValue)
   ) {
     if (isType(nextValue, valueTypes.vnode)) {
       /**
-       * Automatically transfer key to vnode in case it
+       * transfer key to vnode in case it
        * wasn't passed through explicitly.
        */
       nextValue.key = key;
     } else {
       // pass key through to next function
-      nextValue.$$keyPassthrough = key;
+      keyToTransfer = key;
     }
   }
 
-  return processLisp(nextValue, props.$$refId);
+  return processLisp(nextValue, props.$$refId, keyToTransfer);
 };
 
 const validateSeedPath = (seedPath) => {
