@@ -319,8 +319,7 @@ const renderToDomNode = (
 ) => {
   const toNode = createElement(component, seedPath);
 
-  patch(fromNode, toNode);
-  return toNode;
+  return patch(fromNode, toNode);
 };
 
 /**
