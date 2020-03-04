@@ -15,6 +15,99 @@ const cl = {
     list-style: none;`,
 };
 
+const uid = () =>
+  Math.random().toString(36).slice(2);
+
+const inputValue = (e) =>
+  e.target.value;
+
+const initialModel = {
+  newTodo: {
+    text: '',
+    completed: false,
+  },
+  items: Array(6).fill(0)
+    .reduce((itemsByKey, _, index) => {
+      const i = itemsByKey;
+      const key = uid();
+
+      i[key] = {
+        text: `item - ${index}`,
+        completed: false,
+      };
+
+      return i;
+    }, {}),
+  sortBy: 'asc',
+};
+
+const todosModel = () =>
+  atom(initialModel);
+
+const updateTodo = (state, { key, changes }) => {
+  const { items } = state;
+  const curItem = items[key];
+
+  return {
+    ...state,
+    items: {
+      ...items,
+      [key]: { ...curItem,
+               ...changes },
+    },
+  };
+};
+
+const updateNewTodo = (state, { text }) => {
+  const { newTodo } = state;
+
+  return {
+    ...state,
+    newTodo: {
+      ...newTodo,
+      text,
+    },
+  };
+};
+
+const addTodo = (state, { key }) => {
+  const { items, newTodo } = state;
+
+  return {
+    ...state,
+    newTodo: initialModel.newTodo,
+    items: {
+      ...items,
+      [key]: newTodo,
+    },
+  };
+};
+
+const changeSorting = (state, { direction = 'asc' }) =>
+  ({
+    ...state,
+    sortBy: direction,
+  });
+
+const transformItems = (items, sortBy) =>
+  Object.entries(items)
+    .sort(([, valA], [, valB]) => {
+      const { text: a } = valA;
+      const { text: b } = valB;
+      const direction = sortBy === 'asc'
+        ? 1 : -1;
+
+      if (a < b) {
+        return -1 * direction;
+      }
+
+      if (a > b) {
+        return 1 * direction;
+      }
+
+      return 0;
+    });
+
 const modelsByRefId = new Map();
 
 const smartComponentHooks = {
@@ -100,35 +193,6 @@ const WithModel = (config) => {
   );
 };
 
-const uid = () =>
-  Math.random().toString(36).slice(2);
-
-const inputValue = (e) =>
-  e.target.value;
-
-const initialModel = {
-  newTodo: {
-    text: '',
-    completed: false,
-  },
-  items: Array(6).fill(0)
-    .reduce((itemsByKey, _, index) => {
-      const i = itemsByKey;
-      const key = uid();
-
-      i[key] = {
-        text: `item - ${index}`,
-        completed: false,
-      };
-
-      return i;
-    }, {}),
-  sortBy: 'asc',
-};
-
-const todosModel = () =>
-  atom(initialModel);
-
 const Title = (
   [A.h1, 'Todo App']);
 
@@ -209,70 +273,6 @@ const SortOptions = ({ onSortChange }) => {
       [SortBtn, { direction: 'asc' }],
       [SortBtn, { direction: 'desc' }]]);
 };
-
-const updateTodo = (state, { key, changes }) => {
-  const { items } = state;
-  const curItem = items[key];
-
-  return {
-    ...state,
-    items: {
-      ...items,
-      [key]: { ...curItem,
-               ...changes },
-    },
-  };
-};
-
-const updateNewTodo = (state, { text }) => {
-  const { newTodo } = state;
-
-  return {
-    ...state,
-    newTodo: {
-      ...newTodo,
-      text,
-    },
-  };
-};
-
-const addTodo = (state, { key }) => {
-  const { items, newTodo } = state;
-
-  return {
-    ...state,
-    newTodo: initialModel.newTodo,
-    items: {
-      ...items,
-      [key]: newTodo,
-    },
-  };
-};
-
-const changeSorting = (state, { direction = 'asc' }) =>
-  ({
-    ...state,
-    sortBy: direction,
-  });
-
-const transformItems = (items, sortBy) =>
-  Object.entries(items)
-    .sort(([, valA], [, valB]) => {
-      const { text: a } = valA;
-      const { text: b } = valB;
-      const direction = sortBy === 'asc'
-        ? 1 : -1;
-
-      if (a < b) {
-        return -1 * direction;
-      }
-
-      if (a > b) {
-        return 1 * direction;
-      }
-
-      return 0;
-    });
 
 const Main = ({ model }) => {
   const onTodoChange = (payload) =>
