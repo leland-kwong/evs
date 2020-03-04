@@ -61,23 +61,20 @@ const prepareArgs = (
   lisp = emptyArr,
   callback,
   path = [0],
+  skip = 0,
 ) => {
-  // skip first value since it is the lisp function
-  const startFrom = 1;
   const { length } = lisp;
-  let i = startFrom;
   // mutated in while loop
-  const args = new Array(length - startFrom);
+  const args = new Array(Math.max(0, length - skip));
+  let i = 0;
 
-  while (i < length) {
-    const arg = lisp[i];
-    const argPosition = i - startFrom;
-    const refId = addToRefId(path, argPosition);
-    const evaluated = callback(
-      arg, refId,
-    );
+  while (i < args.length) {
+    const argIndex = i + skip;
+    const arg = lisp[argIndex];
+    const refId = addToRefId(path, i);
+    const evaluated = callback(arg, refId);
 
-    args[argPosition] = evaluated;
+    args[i] = evaluated;
     i += 1;
   }
 
@@ -137,13 +134,14 @@ const transformProps = (
  * @returns props object
  */
 const parseProps = (value = [], argProcessor, path) => {
-  const args = prepareArgs(value, argProcessor, path);
-  const firstArg = args[0];
+  const firstArg = value[1];
   const hasProps = isPlainObject(firstArg)
     && !isType(firstArg, valueTypes.vnode);
-  const props = hasProps
-    // remove the first argument
-    ? args.shift() : emptyObj;
+  const props = hasProps ? firstArg : emptyObj;
+  const skipValues = hasProps ? 2 : 1;
+  const args = prepareArgs(
+    value, argProcessor, path, skipValues,
+  );
   const childrenLength = args.length;
   const children = childrenLength > 0
     ? args
@@ -153,7 +151,7 @@ const parseProps = (value = [], argProcessor, path) => {
 
   if (hasDuplicateChildrenProps) {
     throw new Error(
-      'We may not have both a children prop and children arguments',
+      'You may not have both a children prop and children arguments',
     );
   }
 
@@ -252,7 +250,7 @@ const validateSeedPath = (seedPath) => {
 
 /**
  * @param {Array} value atomic ui component
- * @param {String | Number} seedPath id prefix for component tree
+ * @param {String | Number} seedPath id prefix
  * @returns vnode
  */
 const createElement = (value, seedPath) => {
