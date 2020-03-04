@@ -3,7 +3,7 @@ import { init as snabbdomInit } from 'snabbdom';
 import snabbdomProps from './snabbdom-modules/props';
 import { elementTypes } from '../element-types';
 import {
-  createVnode, ignoredValues,
+  createVnode,
 } from './vnode';
 import { string } from '../string';
 import { isArray, isFunc,
@@ -188,10 +188,6 @@ const getLispFunc = (lisp) =>
 /**
  * Recursively processes a tree of Arrays
  * as lisp data structures.
- *
- * @fixme
- * currently root component cannot have a key
- * otherwise app will not rerender.
  */
 const processLisp = (value, path, prevKey) => {
   const isList = isArray(value);
@@ -311,44 +307,19 @@ const nativeElements = Object.keys(elementTypes)
 // the `!` symbol is a comment in snabbdom
 nativeElements.comment = defineElement('!');
 
-const generateSeedPath = () =>
-  Math.random()
-    .toString(32)
-    .slice(2, 6);
-
 /*
  * TODO:
  * Add support for rendering an array of vnodes
  * so we don't require a single parent vnode.
  */
 const renderToDomNode = (
-  domNodeOrComponent,
+  fromNode,
   component,
   seedPath,
 ) => {
-  const d = domNodeOrComponent;
-  const oldVnode = isType(d, valueTypes.vnode)
-    ? d : d.$$oldVnode;
-  const fromNode = oldVnode || d;
-  const path = oldVnode
-    ? oldVnode.props.$$refId
-    : seedPath || generateSeedPath();
-  const toNode = createElement(component, path);
+  const toNode = createElement(component, seedPath);
 
   patch(fromNode, toNode);
-  /*
-   * TODO:
-   * Refactor so that we don't need to store vnode
-   * reference on the dom node directly, and instead
-   * store it in our own cache.
-   */
-  /**
-   * Add vnode reference on dom node for convenience so
-   * you can just render with the dom node as the fromNode
-   * every time.
-   */
-  toNode.elm.$$oldVnode = toNode;
-
   return toNode;
 };
 
