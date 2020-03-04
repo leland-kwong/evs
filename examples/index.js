@@ -232,7 +232,7 @@ function benchFn(
       ];
 
     previousRender = renderWith(
-      previousRender, [View], '@IndexExample',
+      previousRender, [View], '@Example',
     );
   };
 

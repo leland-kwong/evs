@@ -217,19 +217,17 @@ const TodoItem = ({ key, value, onTodoChange }) => {
       { key, changes },
     );
   };
-  const itemCompleted = (
+  const completedField = (
     [A.input, { type: 'checkbox',
                 checked: completed,
                 onChange: toggleCompleted }]);
-  const itemText = (
+  const textField = (
     [A.input, { value: text,
                 onInput: changeText }]);
 
   return (
     [A.li, { class: itemStyle },
-      itemCompleted,
-      ' ',
-      itemText]);
+      completedField, ' ', textField]);
 };
 
 const TodoList = ({ items = [] }) =>
