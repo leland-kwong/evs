@@ -137,7 +137,7 @@ const smartComponentHooks = {
     const { model, modelRefKey } = config;
 
     atomicState
-      .removeWatch(model, renderVnode);
+      .removeWatch(model, modelRefKey);
     modelsByRefId.delete(modelRefKey);
   },
 };

@@ -33,16 +33,11 @@ const Greeting = (props) => {
   );
 };
 
-const Lazy = ({ children }) => {
-  console.log('Lazy', children);
-  return children;
-};
+const Lazy = ({ children }) =>
+  children;
 
-const PassThrough = (props) => {
-  console.log('PassThrough', props);
-  // props.cond;
-  return 'foo';
-};
+const PassThrough = (props) =>
+  'pass through';
 
 const LazyList = () =>
   [A.div, 1, 2, 3];

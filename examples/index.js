@@ -10,112 +10,6 @@ import {
 import * as styles from './styles';
 import { TodoApp } from './todo-app';
 
-const makeTodoId = () =>
-  Math.random().toString(32).slice(2);
-
-function setupNewTodo(props = {}) {
-  const {
-    id = makeTodoId(),
-    text = '',
-    done = false,
-  } = props;
-
-  return { text, done, id };
-}
-
-const globalState = atomicState.atom({
-  todos: {},
-  newTodo: setupNewTodo(),
-  actionPerf: {
-    count: 5,
-  },
-  tickCount: 0,
-  logAction: false,
-});
-
-const stateReducers = {
-  Init(state) {
-    return state;
-  },
-  AddTodo(state) {
-    return {
-      ...state,
-      newTodo: setupNewTodo(),
-      todos: {
-        ...state.todos,
-        [state.newTodo.id]:
-          state.newTodo,
-      },
-    };
-  },
-  SetNewTodoText(state, action) {
-    const { text } = action;
-
-    return {
-      ...state,
-      newTodo: {
-        ...state.newTodo,
-        text,
-      },
-    };
-  },
-  EditTodo(state, action) {
-    const { id, changes } = action;
-    const todo = state.todos[id];
-
-    return {
-      ...state,
-      todos: {
-        ...state.todos,
-        [id]: {
-          ...todo,
-          ...changes,
-        },
-      },
-    };
-  },
-  SetActionPerfCount(state, action) {
-    const { count } = action;
-
-    return {
-      ...state,
-      actionPerf: {
-        ...state.actionPerf,
-        count,
-      },
-    };
-  },
-  Tick(state) {
-    return {
-      ...state,
-      tickCount: state.tickCount + 1,
-    };
-  },
-  SetupMockTodos(state, { count = 1 }) {
-    return {
-      ...state,
-      todos: Array(count).fill(0).reduce((result, _, index) => {
-        const r = result;
-        r[`item${index}`] = setupNewTodo({
-          id: `item${index}`,
-          text: 'initial item',
-        });
-
-        return r;
-      }, {
-      }),
-    };
-  },
-  EnableLogAction(state, action) {
-    const { enabled = true } = action;
-
-    return {
-      ...state,
-      logAction: enabled,
-    };
-  },
-};
-
 function benchFn(
   fn, arg, numTests,
   runSoFar = 0, results = [],
@@ -326,11 +220,14 @@ function benchFn(
         { style: {
           fontFamily: 'sans-serif',
         } },
-        [TodoApp, { key: 'TodoA' }],
+        [data.name.length % 2 === 0
+          ? [TodoApp]
+          : null],
         // [DevDashboard, data],
         [PerfTests],
         [Hello, { name: data.name,
-                  scope }]];
+                  scope,
+                  key: '@HelloApp' }]];
 
     renderToDomNode(rootDom, [View], '@IndexExample');
   };
