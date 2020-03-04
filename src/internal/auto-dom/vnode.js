@@ -32,10 +32,11 @@ const handleProp = Object.freeze({
       .setAttribute('data-key', newKey);
   },
 
-  style(oldStyle, newStyleObj, oldRef, ref) {
+  style(oldStyle = {}, newStyleObj, oldRef, ref) {
     const domNode = getDomNode(ref);
-    const isDifferentDomNode = oldRef && oldRef.elm
-      !== ref.elm;
+    const isDifferentDomNode = oldRef
+      ? oldRef.elm !== ref.elm
+      : false;
 
     if (!newStyleObj) {
       setValue(domNode, 'style', null);
@@ -44,7 +45,7 @@ const handleProp = Object.freeze({
     // remove old styles
     if (isDifferentDomNode) {
       const hasOwn = Object.prototype.hasOwnProperty;
-      Object.keys(oldStyle || emptyObj).forEach((k) => {
+      Object.keys(oldStyle).forEach((k) => {
         if (!hasOwn.call(newStyleObj, k)) {
           setValue(domNode.style, k, null);
         }
@@ -53,10 +54,7 @@ const handleProp = Object.freeze({
 
     Object.keys(newStyleObj).forEach((k) => {
       const nextValue = newStyleObj[k];
-      const isSameValue = oldStyle
-        && oldStyle[k] === nextValue;
 
-      if (isSameValue) return;
       setValue(
         domNode.style, k, nextValue,
       );

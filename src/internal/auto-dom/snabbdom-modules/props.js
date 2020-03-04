@@ -68,9 +68,6 @@ exports.propsModule = {
    * property to make sure the state of the control
    * is always a representation of the the render.
    */
-  // init: (oldVnode, vnode) => {
-  //   updateProps('onInit', oldVnode, vnode);
-  // },
   create: (oldVnode, vnode) => {
     updateProps(hookType.create, oldVnode, vnode);
   },
