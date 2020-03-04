@@ -7,14 +7,10 @@ import { isArray, isFunc,
 import { emptyObj, emptyArr } from '../../constants';
 import * as valueTypes from './value-types';
 
+const { isType } = valueTypes;
+
 const getDomNode = (vnode) =>
   vnode.elm;
-
-// vnode utils
-const isVnode = (value) =>
-  (value
-    ? value.type === valueTypes.vnode
-    : false);
 
 const remappedEventTypes = {
   focusin: 'focus',
@@ -115,7 +111,7 @@ const validateValue = (value) => {
   }
 
   const isObjectChild = typeof value === 'object'
-    && !isVnode(value);
+    && !isType(value, valueTypes.vnode);
 
   if (isObjectChild) {
     const stringified = stringifyValueForLogging(value);
@@ -164,7 +160,7 @@ function coerceToVnode(newChildren, value) {
     return newChildren;
   }
 
-  if (isVnode(value)) {
+  if (isType(value, valueTypes.vnode)) {
     newChildren.push(value);
     return newChildren;
   }
@@ -224,7 +220,7 @@ const createVnode = (tagName, props) => {
 };
 
 export {
-  createVnode, createTextVnode, isVnode,
+  createVnode, createTextVnode,
   ignoredValues, primitiveTypes,
   getDomNode,
 };

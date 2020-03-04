@@ -3,7 +3,7 @@ import { init as snabbdomInit } from 'snabbdom';
 import snabbdomProps from './snabbdom-modules/props';
 import { elementTypes } from '../element-types';
 import {
-  isVnode, createVnode, ignoredValues,
+  createVnode, ignoredValues,
 } from './vnode';
 import { string } from '../string';
 import { isArray, isFunc,
@@ -13,6 +13,8 @@ import { isArray, isFunc,
   identity } from '../utils';
 import { emptyObj, emptyArr } from '../../constants';
 import * as valueTypes from './value-types';
+
+const { isType } = valueTypes;
 
 const vnodeKeyTypes = {
   string: true,
@@ -138,7 +140,7 @@ const parseProps = (value = [], argProcessor, path) => {
   const args = prepareArgs(value, argProcessor, path);
   const firstArg = args[0];
   const hasProps = isPlainObject(firstArg)
-    && !isVnode(firstArg);
+    && !isType(firstArg, valueTypes.vnode);
   const props = hasProps
     // remove the first argument
     ? args.shift() : emptyObj;
@@ -205,10 +207,14 @@ const processLisp = (value, path) => {
     return value;
   }
 
+  const v = value;
+  // add type annotation
+  v.type = valueTypes.fnComponent;
+
   const f = getLispFunc(value);
-  const argProcessor = f.type
-    === valueTypes.nativeElement
-    // only eagerly process vnode functions
+  const argProcessor = isType(
+    f, valueTypes.domComponent,
+  ) // only eagerly process vnode functions
     ? processLisp : identity;
   const props = parseProps(
     value, argProcessor, path,
@@ -221,7 +227,7 @@ const processLisp = (value, path) => {
   if (isDef(key)
     && !ignoredValues.has(nextValue)
   ) {
-    if (isVnode(nextValue)) {
+    if (isType(nextValue, valueTypes.vnode)) {
       /**
        * Automatically transfer key to vnode in case it
        * wasn't passed through explicitly.
@@ -250,7 +256,7 @@ const validateSeedPath = (seedPath) => {
  * @returns vnode
  */
 const createElement = (value, seedPath) => {
-  if (isVnode(value)) {
+  if (isType(value, valueTypes.vnode)) {
     return value;
   }
 
@@ -284,7 +290,7 @@ const defineElement = (tagName) => {
       value: tagName,
     },
     type: {
-      value: valueTypes.nativeElement,
+      value: valueTypes.domComponent,
     },
   });
 };
@@ -316,7 +322,7 @@ const renderToDomNode = (
   component,
   seedPath,
 ) => {
-  const oldVnode = isVnode(domNode)
+  const oldVnode = isType(domNode, valueTypes.vnode)
     ? domNode
     : domNode.oldVnode;
   const fromNode = oldVnode || domNode;
@@ -336,7 +342,7 @@ const renderToDomNode = (
 const cloneElement = (...args) => {
   const [element, config, children = []] = args;
 
-  if (!isVnode(element)) {
+  if (!isType(element, valueTypes.vnode)) {
     throw new Error(
       '[cloneElement] Element must be a vnode',
     );
@@ -372,7 +378,7 @@ export {
   renderToDomNode,
   createElement,
   cloneElement,
-  isVnode as isElement,
+  valueTypes,
 };
 
 export { getDomNode } from './vnode';

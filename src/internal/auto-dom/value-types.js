@@ -1,3 +1,6 @@
+export const isType = (value, type) =>
+  value && value.type === type;
+
 export const vnode = Symbol('@vnode');
-export const nativeElement = Symbol('@nativeElement');
-export const componentElement = Symbol('@componentElement');
+export const domComponent = Symbol('@domComponent');
+export const fnComponent = Symbol('@fnComponent');
