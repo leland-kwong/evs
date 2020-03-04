@@ -112,14 +112,18 @@ const modelsByRefId = new Map();
 
 const smartComponentHooks = {
   onUpdate: (initialVnode, config) => {
+    /**
+     * @important
+     * We need to transfer the key over to the newly
+     * rendered vnode
+     */
     const { key, props: { $$refId } } = initialVnode;
     const { render, model, modelRefKey, props } = config;
+    let oldVnode = initialVnode;
     const component = (
       [render, { props,
                  key,
                  model }]);
-    let oldVnode = initialVnode;
-
     const renderComponent = () => {
       oldVnode = renderWith(
         oldVnode,
