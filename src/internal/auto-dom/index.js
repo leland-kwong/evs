@@ -139,22 +139,6 @@ const parseProps = (value = [], argProcessor, path) => {
     && !isType(firstArg, valueTypes.vnode);
   const props = hasProps ? firstArg : emptyObj;
   const skipValues = hasProps ? 2 : 1;
-  const args = prepareArgs(
-    value, argProcessor, path, skipValues,
-  );
-  const childrenLength = args.length;
-  const children = childrenLength > 0
-    ? args
-    : props.children;
-  const hasDuplicateChildrenProps = childrenLength > 0
-    && props.children;
-
-  if (hasDuplicateChildrenProps) {
-    throw new Error(
-      'You may not have both a children prop and children arguments',
-    );
-  }
-
   const lastDotIndex = path.lastIndexOf('.');
   const refId = props.key
     /**
@@ -168,6 +152,21 @@ const parseProps = (value = [], argProcessor, path) => {
       props.key,
     )
     : path;
+  const args = prepareArgs(
+    value, argProcessor, refId, skipValues,
+  );
+  const childrenLength = args.length;
+  const children = childrenLength > 0
+    ? args
+    : props.children;
+  const hasDuplicateChildrenProps = childrenLength > 0
+    && props.children;
+
+  if (hasDuplicateChildrenProps) {
+    throw new Error(
+      'You may not have both a children prop and children arguments',
+    );
+  }
 
   const baseProps = {
     children,
