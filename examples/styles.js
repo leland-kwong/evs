@@ -5,6 +5,8 @@
 */
 import { css } from 'emotion';
 
+export const baseFont = css`font-family: sans-serif`;
+
 export const capitalize = css`text-transform: capitalize;`;
 
 export const bold = css`font-weight: bold;`;

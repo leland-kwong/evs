@@ -8,6 +8,7 @@ import {
   createElement,
 } from './prototype.ldom';
 import * as styles from './styles';
+import { TodoApp } from './todo-app';
 
 const makeTodoId = () =>
   Math.random().toString(32).slice(2);
@@ -325,12 +326,13 @@ function benchFn(
         { style: {
           fontFamily: 'sans-serif',
         } },
-        [DevDashboard, data],
+        [TodoApp, { key: 'TodoA' }],
+        // [DevDashboard, data],
         [PerfTests],
         [Hello, { name: data.name,
                   scope }]];
 
-    renderToDomNode(rootDom, [View]);
+    renderToDomNode(rootDom, [View], '@IndexExample');
   };
 
   const rootReducer = (state, action) => {
