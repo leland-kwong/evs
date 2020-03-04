@@ -3,7 +3,7 @@ import { getSupportedEventTypes } from '../../get-event-types';
 import { invalidComponentMsg } from './invalid-component-msg';
 import { string } from '../string';
 import { isArray, isFunc,
-  setValue, stringifyValueForLogging } from '../utils';
+  setValue, stringifyValueForLogging, isDef } from '../utils';
 import { emptyObj, emptyArr } from '../../constants';
 import * as valueTypes from './value-types';
 
@@ -28,6 +28,10 @@ const handleProp = Object.freeze({
   },
 
   key(oldKey, newKey, oldRef, newRef) {
+    if (!isDef(newKey)) {
+      return;
+    }
+
     getDomNode(newRef)
       .setAttribute('data-key', newKey);
   },

@@ -18,6 +18,7 @@ const { isType } = valueTypes;
 
 const vnodeKeyTypes = {
   string: true,
+  number: true,
 };
 
 const keyRegex = /^[a-zA-Z0-9-_@]*$/;
@@ -72,7 +73,7 @@ const prepareArgs = (
     const argIndex = i + skip;
     const arg = lisp[argIndex];
     const refId = addToRefId(path, i);
-    const evaluated = callback(arg, refId);
+    const evaluated = callback(arg, refId, i);
 
     args[i] = evaluated;
     i += 1;
@@ -133,14 +134,17 @@ const transformProps = (
  * @param {Function} argProcessor
  * @returns props object
  */
-const parseProps = (value = [], argProcessor, path) => {
+const parseProps = (value = [], argProcessor, path, prevKey) => {
   const firstArg = value[1];
   const hasProps = isPlainObject(firstArg)
     && !isType(firstArg, valueTypes.vnode);
   const props = hasProps ? firstArg : emptyObj;
   const skipValues = hasProps ? 2 : 1;
   const lastDotIndex = path.lastIndexOf('.');
-  const refId = props.key
+  const { key: keyFromProps } = props;
+  const key = validateKey(isDef(keyFromProps)
+    ? keyFromProps : prevKey);
+  const refId = isDef(key)
     /**
      * Replace last position of id with key so that
      * the id remains consistent when an element's
@@ -149,7 +153,7 @@ const parseProps = (value = [], argProcessor, path) => {
     ? addToRefId(
       path.slice(0, lastDotIndex !== -1
         ? lastDotIndex : path.length),
-      props.key,
+      key,
     )
     : path;
   const args = prepareArgs(
@@ -172,6 +176,7 @@ const parseProps = (value = [], argProcessor, path) => {
     children,
     $$hook: {},
     $$refId: refId,
+    key,
   };
 
   return transformProps(baseProps, props);
@@ -183,6 +188,10 @@ const getLispFunc = (lisp) =>
 /**
  * Recursively processes a tree of Arrays
  * as lisp data structures.
+ *
+ * @fixme
+ * currently root component cannot have a key
+ * otherwise app will not rerender.
  */
 const processLisp = (value, path, prevKey) => {
   const isList = isArray(value);
@@ -195,9 +204,10 @@ const processLisp = (value, path, prevKey) => {
 
   if (!isLispLike) {
     if (isList) {
-      return value.map((v, i) => {
-        const refId = addToRefId(path, i);
-        return processLisp(v, refId, prevKey);
+      return value.map((v, autoKey) => {
+        const refId = addToRefId(path, autoKey);
+        // auto-key by the index
+        return processLisp(v, refId, autoKey);
       });
     }
 
@@ -214,29 +224,23 @@ const processLisp = (value, path, prevKey) => {
   ) // only eagerly process vnode functions
     ? processLisp : identity;
   const props = parseProps(
-    value, argProcessor, path,
+    value, argProcessor, path, prevKey,
   );
   const nextValue = f(props, path);
-  const key = validateKey(
-    props.key || prevKey,
-  );
+  const { key: keyFromProps } = props;
+  const keyToTransfer = isDef(keyFromProps)
+    ? keyFromProps
+    : prevKey;
 
-  let keyToTransfer;
-  if (isDef(key)
-    // null, false, etc... can't have keys
-    && !ignoredValues.has(nextValue)
-  ) {
-    if (isType(nextValue, valueTypes.vnode)) {
-      /**
-       * transfer key to vnode in case it
-       * wasn't passed through explicitly.
-       */
-      nextValue.key = key;
-    } else {
-      // pass key through to next function
-      keyToTransfer = key;
-    }
-  }
+  // if (isDef(key)
+  //   // null, false, etc... can't have keys
+  //   && !ignoredValues.has(nextValue)
+  // ) {
+  //   if (!isType(nextValue, valueTypes.vnode)) {
+  //     // pass key through to next function
+  //     keyToTransfer = key;
+  //   }
+  // }
 
   return processLisp(nextValue, props.$$refId, keyToTransfer);
 };
@@ -244,7 +248,8 @@ const processLisp = (value, path, prevKey) => {
 const validateSeedPath = (seedPath) => {
   if (!vnodeKeyTypes[typeof seedPath]) {
     throw new Error(string([
-      '[createElement] `seedPath` must be a string',
+      '[createElement] `seedPath` must be one of ',
+      `[${Object.keys(vnodeKeyTypes)}]`,
     ]));
   }
 };
@@ -263,7 +268,7 @@ const createElement = (value, seedPath) => {
     validateSeedPath(seedPath);
   }
 
-  return processLisp(value, seedPath);
+  return processLisp(value, String(seedPath));
 };
 
 /**
@@ -279,8 +284,8 @@ const createElement = (value, seedPath) => {
  * ```
  */
 const defineElement = (tagName) => {
-  function elementFactory(props, refId) {
-    return createVnode(tagName, props, refId);
+  function elementFactory(props) {
+    return createVnode(tagName, props);
   }
 
   const defineProps = Object.defineProperties;

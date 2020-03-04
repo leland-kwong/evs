@@ -126,30 +126,30 @@ describe('createElement', () => {
       const seedPath = 'withKey';
       const list = createElement(
         [1, 2].map((value) =>
-          [Component, { value, key: String(value) }]),
+          [Component, { value, key: value }]),
         seedPath,
       );
 
       expect(list)
         .toEqual(
           createElement([
-            [Component, { value: 1, key: String(1) }],
-            [Component, { value: 2, key: String(2) }],
+            [Component, { value: 1, key: 1 }],
+            [Component, { value: 2, key: 2 }],
           ], seedPath),
         );
 
       const outOfOrderList = createElement(
         [2, 1, 3].map((value, i) =>
-          [Component, { value, key: String(i) }]),
+          [Component, { value, key: i }]),
         seedPath,
       );
 
       expect(outOfOrderList)
         .toEqual(
           createElement([
-            [Component, { value: 2, key: String(0) }],
-            [Component, { value: 1, key: String(1) }],
-            [Component, { value: 3, key: String(2) }],
+            [Component, { value: 2, key: 0 }],
+            [Component, { value: 1, key: 1 }],
+            [Component, { value: 3, key: 2 }],
           ], seedPath),
         );
     });
