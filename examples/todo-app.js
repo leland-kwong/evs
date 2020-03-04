@@ -8,6 +8,12 @@ import { nativeElements as A,
 import { ignoredValues } from '../src/internal/auto-dom/vnode';
 
 const { atom, swap, read } = atomicState;
+const cl = {
+  list: css`
+    margin: 0;
+    padding: 0;
+    list-style: none;`,
+};
 
 const modelsByRefId = new Map();
 
@@ -15,15 +21,16 @@ const smartComponentHooks = {
   onUpdate: (initialVnode, config) => {
     const { key, props: { $$refId } } = initialVnode;
     const { render, model, modelRefKey, props } = config;
-
+    const component = (
+      [render, { props,
+                 key,
+                 model }]);
     let oldVnode = initialVnode;
 
     const renderComponent = () => {
       oldVnode = renderToDomNode(
         oldVnode,
-        [render, { props,
-                   key,
-                   model }],
+        component,
         $$refId,
       );
     };
@@ -106,7 +113,7 @@ const initialModel = {
     text: '',
     completed: false,
   },
-  items: Array(2).fill(0)
+  items: Array(5).fill(0)
     .reduce((itemsByKey, _, index) => {
       const i = itemsByKey;
       const key = uid();
@@ -130,6 +137,8 @@ const ItemList = ({ items }) =>
   items.map(({ key, value, onTodoChange }) => {
     const { text, completed } = value;
     const itemStyle = css`
+      ${cl.list}
+
       input {
         text-decoration: ${completed ? 'line-through' : null};
       }
@@ -163,12 +172,7 @@ const ItemList = ({ items }) =>
 
 const TodoList = ({ items = [] }) =>
   ([A.ul,
-    { class: css`
-        ul, li {
-          margin: 0;
-          padding: 0;
-          list-style: none;
-        }` },
+    { class: cl.list },
     [ItemList, { items }]]);
 
 const NewTodo = ({ onNewTodoCreate, onNewTodoChange, newTodo }) => {
@@ -187,6 +191,24 @@ const NewTodo = ({ onNewTodoCreate, onNewTodoChange, newTodo }) => {
         onNewTodoCreate({ key });
       } },
       newTodoText]);
+};
+
+const SortOptions = ({ onSortChange }) => {
+  const SortBtn = ({ direction }) => {
+    const description = direction;
+
+    return (
+      [A.button,
+        { type: 'button',
+          onClick: () =>
+            onSortChange({ direction }) },
+        description]);
+  };
+
+  return (
+    [A.div,
+      [SortBtn, { direction: 'asc' }],
+      [SortBtn, { direction: 'desc' }]]);
 };
 
 const updateTodo = (state, { key, changes }) => {
@@ -228,6 +250,31 @@ const addTodo = (state, { key }) => {
   };
 };
 
+const changeSorting = (state, { direction = 'asc' }) =>
+  ({
+    ...state,
+    sortBy: direction,
+  });
+
+const transformItems = (items, sortBy) =>
+  Object.entries(items)
+    .sort(([, valA], [, valB]) => {
+      const { text: a } = valA;
+      const { text: b } = valB;
+      const direction = sortBy === 'asc'
+        ? 1 : -1;
+
+      if (a < b) {
+        return -1 * direction;
+      }
+
+      if (a > b) {
+        return 1 * direction;
+      }
+
+      return 0;
+    });
+
 const Main = ({ model }) => {
   const onTodoChange = (payload) =>
     swap(model, updateTodo, payload);
@@ -235,10 +282,9 @@ const Main = ({ model }) => {
     swap(model, addTodo, payload);
   const onNewTodoChange = (payload) =>
     swap(model, updateNewTodo, payload);
-  const { items = {}, newTodo } = read(model);
-  const itemsArray = Object.entries(items)
-    .map(([key, value]) =>
-      ({ key, value, onTodoChange }));
+  const onSortChange = (payload) =>
+    swap(model, changeSorting, payload);
+  const { items = {}, newTodo, sortBy } = read(model);
 
   return (
     [A.div,
@@ -248,8 +294,11 @@ const Main = ({ model }) => {
         onNewTodoChange,
         newTodo,
       }],
+      [SortOptions, { onSortChange }],
       [TodoList,
-        { items: itemsArray }],
+        { items: transformItems(items, sortBy)
+          .map(([key, value]) =>
+            ({ key, value, onTodoChange })) }],
     ]);
 };
 
