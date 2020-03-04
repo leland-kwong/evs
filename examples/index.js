@@ -3,7 +3,7 @@ import * as atomicState from 'atomic-state/lib';
 import * as evs from '../src/index';
 import {
   Hello,
-  renderToDomNode,
+  renderWith,
   nativeElements,
   createElement,
 } from './prototype.ldom';
@@ -155,6 +155,8 @@ function benchFn(
           toggler, ' ', 'log action']]);
   };
 
+  let previousRender = rootDom;
+
   const render = (data) => {
     const PerfTests = () => {
       const runBench = () =>
@@ -223,13 +225,15 @@ function benchFn(
         [data.name.length % 2 === 0
           ? [TodoApp]
           : null],
-        // [DevDashboard, data],
+        [DevDashboard, data],
         [PerfTests],
         [Hello, { name: data.name,
-                  scope,
-                  key: '@HelloApp' }]];
+                  scope }],
+      ];
 
-    renderToDomNode(rootDom, [View], '@IndexExample');
+    previousRender = renderWith(
+      previousRender, [View], '@IndexExample',
+    );
   };
 
   const rootReducer = (state, action) => {

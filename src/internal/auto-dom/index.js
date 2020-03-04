@@ -312,7 +312,7 @@ nativeElements.comment = defineElement('!');
  * Add support for rendering an array of vnodes
  * so we don't require a single parent vnode.
  */
-const renderToDomNode = (
+const renderWith = (
   fromNode,
   component,
   seedPath,
@@ -362,7 +362,7 @@ const cloneElement = (...args) => {
 export {
   defineElement,
   nativeElements,
-  renderToDomNode,
+  renderWith,
   createElement,
   cloneElement,
   valueTypes,

@@ -3,7 +3,7 @@ import * as atomicState from 'atomic-state';
 import { nativeElements as A,
   createElement,
   cloneElement,
-  renderToDomNode,
+  renderWith,
   valueTypes } from '../src/internal/auto-dom';
 import { ignoredValues } from '../src/internal/auto-dom/vnode';
 
@@ -121,7 +121,7 @@ const smartComponentHooks = {
     let oldVnode = initialVnode;
 
     const renderComponent = () => {
-      oldVnode = renderToDomNode(
+      oldVnode = renderWith(
         oldVnode,
         component,
         $$refId,
