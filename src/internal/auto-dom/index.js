@@ -229,16 +229,6 @@ const processLisp = (value, path, prevKey) => {
     ? keyFromProps
     : prevKey;
 
-  // if (isDef(key)
-  //   // null, false, etc... can't have keys
-  //   && !ignoredValues.has(nextValue)
-  // ) {
-  //   if (!isType(nextValue, valueTypes.vnode)) {
-  //     // pass key through to next function
-  //     keyToTransfer = key;
-  //   }
-  // }
-
   return processLisp(nextValue, props.$$refId, keyToTransfer);
 };
 
