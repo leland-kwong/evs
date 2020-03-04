@@ -65,8 +65,9 @@ const prepareArgs = (
   skip = 0,
 ) => {
   const { length } = lisp;
+  const argsLength = Math.max(0, length - skip);
   // mutated in while loop
-  const args = new Array(Math.max(0, length - skip));
+  const args = new Array(argsLength);
   let i = 0;
 
   while (i < args.length) {
