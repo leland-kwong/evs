@@ -1,7 +1,7 @@
 /* global */
 
 import * as evs from '../src';
-import { nativeElements as A } from '../src/internal/auto-dom';
+import { nativeElements as A, createElement } from '../src/internal/auto-dom';
 
 function SetName(name) {
   return {
@@ -33,35 +33,23 @@ const Greeting = (props) => {
   );
 };
 
-const Lazy = ({ children }) =>
-  children;
+const Fragment = () =>
+  ([A.div,
+    [A.div, 'a'],
+    1,
+    [A.div, 'b'],
+  ]);
 
-const PassThrough = (props) =>
-  'pass through';
-
-const LazyList = () =>
-  [A.div, 1, 2, 3];
+console.log(
+  createElement([Fragment], '@fragment'),
+);
 
 const Hello = ({ name, scope }) =>
   ([A.div, { class: 'HelloRoot' },
-    [Lazy,
-      [PassThrough,
-        { cond: [
-          [name.length > 4,
-            LazyList],
-        ] },
-        [A.div, 1, 2, 3],
-      ],
-    ],
     [A.hr, { style: { height: '1px',
                       margin: '1rem 0',
                       background: '#000' } }],
     [Greeting, { name, scope }],
-    [A.div,
-      [Array(name.length)
-        .fill(0)
-        .map((_, i) =>
-          i)]],
   ]);
 
 export {
