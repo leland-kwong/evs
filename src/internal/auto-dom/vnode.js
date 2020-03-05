@@ -187,10 +187,11 @@ function coerceToVnode(newChildren, value) {
   return newChildren;
 }
 
-const createVnode = (tagName, props) => {
+const createVnode = (tagName, config) => {
+  const { props } = config;
+  const { key } = config;
   const {
     children = emptyArr,
-    key,
     // special snabbdom hooks
     $$hook: elementHooks = emptyObj,
   } = props;

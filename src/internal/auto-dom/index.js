@@ -84,11 +84,11 @@ const prepareArgs = (
 };
 
 const propTransformer = {
-  children(props, _, childrenFromArgs) {
-    setValue(props, 'children',
-      props.children
-      || childrenFromArgs);
-  },
+  /**
+   * don't transfer over key since it is for
+   * internal use only
+   */
+  key() {},
   hookInit(props, key, value) {
     setValue(props.$$hook, 'init', value);
   },
@@ -173,14 +173,17 @@ const parseProps = (value = [], argProcessor, path, prevKey) => {
     );
   }
 
-  const baseProps = {
-    children,
-    $$hook: {},
-    $$refId: refId,
+  const baseConfig = {
     key,
+    props: {
+      $$hook: {},
+      $$refId: refId,
+      children,
+    },
   };
 
-  return transformProps(baseProps, props);
+  transformProps(baseConfig.props, props);
+  return baseConfig;
 };
 
 const getLispFunc = (lisp) =>
@@ -224,15 +227,18 @@ const processLisp = (value, path, prevKey) => {
   }
 
   const f = getLispFunc(value);
-  const argProcessor = isType(
+  const isDomComp = isType(
     f, valueTypes.domComponent,
-  ) // only eagerly process vnode functions
+  );
+  const argProcessor = isDomComp
+    // only eagerly process vnode functions
     ? processLisp : identity;
-  const props = parseProps(
+  const config = parseProps(
     value, argProcessor, path, prevKey,
   );
-  const nextValue = f(props, path);
-  const { key = prevKey, $$refId } = props;
+  const fInput = isDomComp ? config : config.props;
+  const nextValue = f(fInput, path);
+  const { key = prevKey, props: { $$refId } } = config;
 
   return processLisp(nextValue, $$refId, key);
 };
@@ -276,8 +282,8 @@ const createElement = (value, seedPath) => {
  * ```
  */
 const defineElement = (tagName) => {
-  function elementFactory(props) {
-    return createVnode(tagName, props);
+  function elementFactory(config) {
+    return createVnode(tagName, config);
   }
 
   const defineProps = Object.defineProperties;
@@ -352,7 +358,12 @@ const cloneElement = (...args) => {
     props.children = childArray;
   }
 
-  return createVnode(sel, props);
+  const newConfig = {
+    key: element.key,
+    props,
+  };
+
+  return createVnode(sel, newConfig);
 };
 
 export {
