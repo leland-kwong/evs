@@ -189,6 +189,12 @@ const getLispFunc = (lisp) =>
 /**
  * Recursively processes a tree of Arrays
  * as lisp data structures.
+ *
+ * @param {any} value
+ * @param {String} path
+ * @param {String | Number} prevKey The key prop
+ * that transferred through from a previous functional
+ * component call.
  */
 const processLisp = (value, path, prevKey) => {
   const isList = isArray(value);
@@ -211,9 +217,11 @@ const processLisp = (value, path, prevKey) => {
     return value;
   }
 
-  const v = value;
-  // add type annotation
-  v.type = valueTypes.fnComponent;
+  if (process.env.NODE_ENV === 'development') {
+    const v = value;
+    // add type annotation for dev purposes
+    v.type = valueTypes.fnComponent;
+  }
 
   const f = getLispFunc(value);
   const argProcessor = isType(
@@ -224,12 +232,9 @@ const processLisp = (value, path, prevKey) => {
     value, argProcessor, path, prevKey,
   );
   const nextValue = f(props, path);
-  const { key: keyFromProps, $$refId } = props;
-  const keyToTransfer = isDef(keyFromProps)
-    ? keyFromProps
-    : prevKey;
+  const { key = prevKey, $$refId } = props;
 
-  return processLisp(nextValue, $$refId, keyToTransfer);
+  return processLisp(nextValue, $$refId, key);
 };
 
 const validateSeedPath = (seedPath) => {
