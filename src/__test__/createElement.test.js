@@ -3,6 +3,8 @@ import {
   createElement,
 } from '../internal/auto-dom';
 
+const seedPath = 'withKey';
+
 describe('createElement', () => {
   describe('error when invalid seed path', () => {
     test('no seed path provided', () => {
@@ -23,14 +25,24 @@ describe('createElement', () => {
     });
   });
 
-  describe('Functional component', () => {
-    const seedPath = 'withKey';
+  test('props', () => {
+    const Component = ({ myProp }) =>
+      [A.div, myProp];
+    const element = createElement(
+      [Component, { myProp: 'foo' }], seedPath,
+    );
 
+    expect(
+      element.props.children[0],
+    ).toBe('foo');
+  });
+
+  describe('Functional component', () => {
     test('ref id', () => {
-      const Component = () =>
-        [A.div, 'foo'];
+      const Component = ({ myProp }) =>
+        [A.div, myProp];
       const element = createElement(
-        [Component], seedPath,
+        [Component, { myProp: 'foo' }], seedPath,
       );
 
       expect(
@@ -70,7 +82,6 @@ describe('createElement', () => {
   });
 
   describe('Functional component with key', () => {
-    const seedPath = 'withKey';
     const key = 'bar-key';
     const Component = () =>
       [A.div, [A.div, 'foo']];
@@ -86,7 +97,6 @@ describe('createElement', () => {
   });
 
   describe('Child component with key', () => {
-    const seedPath = 'withKey';
     const key = 'bar-key';
     const Component = () =>
       [A.div, [A.div, { key }, 'foo']];
@@ -106,7 +116,6 @@ describe('createElement', () => {
       ([A.div, value]);
 
     test('simple list', () => {
-      const seedPath = 'withKey';
       const list = createElement(
         [1, 2].map((value) =>
           [Component, { value }]),
@@ -123,7 +132,6 @@ describe('createElement', () => {
     });
 
     test('list with keys', () => {
-      const seedPath = 'withKey';
       const list = createElement(
         [1, 2].map((value) =>
           [Component, { value, key: value }]),
@@ -155,7 +163,6 @@ describe('createElement', () => {
     });
 
     test('auto-expand nested lists', () => {
-      const seedPath = 'nestedList';
       const nestedList = createElement(
         [A.div, 1, [2, 3, [4]]],
         seedPath,
