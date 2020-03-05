@@ -141,9 +141,7 @@ const parseProps = (value = [], argProcessor, path, prevKey) => {
   const props = hasProps ? firstArg : emptyObj;
   const skipValues = hasProps ? 2 : 1;
   const lastDotIndex = path.lastIndexOf('.');
-  const { key: keyFromProps } = props;
-  const key = validateKey(isDef(keyFromProps)
-    ? keyFromProps : prevKey);
+  const { key = prevKey } = props;
   const refId = isDef(key)
     /**
      * Replace last position of path with key so that
@@ -208,10 +206,15 @@ const processLisp = (value, path, prevKey) => {
 
   if (!isLispLike) {
     if (isList) {
-      return value.map((v, autoKey) => {
-        const refId = addToRefId(path, autoKey);
-        // auto-key by the index
-        return processLisp(v, refId, autoKey);
+      return value.map((v, defaultKey) => {
+        const refId = addToRefId(path, defaultKey);
+        /**
+         * @important
+         * We set default key as the index so when
+         * siblings are shuffled, form controls
+         * can still maintain their focus.
+         */
+        return processLisp(v, refId, defaultKey);
       });
     }
 
