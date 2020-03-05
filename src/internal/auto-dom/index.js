@@ -224,12 +224,12 @@ const processLisp = (value, path, prevKey) => {
     value, argProcessor, path, prevKey,
   );
   const nextValue = f(props, path);
-  const { key: keyFromProps } = props;
+  const { key: keyFromProps, $$refId } = props;
   const keyToTransfer = isDef(keyFromProps)
     ? keyFromProps
     : prevKey;
 
-  return processLisp(nextValue, props.$$refId, keyToTransfer);
+  return processLisp(nextValue, $$refId, keyToTransfer);
 };
 
 const validateSeedPath = (seedPath) => {
