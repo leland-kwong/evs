@@ -28,6 +28,10 @@ const handleProp = Object.freeze({
   },
 
   key(oldKey, newKey, oldRef, newRef) {
+    if (process.env.NODE_ENV !== 'development') {
+      return;
+    }
+
     if (!isDef(newKey)) {
       return;
     }
