@@ -129,17 +129,21 @@ const transformConfig = (
   return config;
 };
 
+const getPropsFromArgs = (value) => {
+  const firstArg = value[1];
+  const hasProps = isPlainObject(firstArg)
+    && !isType(firstArg, valueTypes.vnode);
+
+  return hasProps ? firstArg : emptyObj;
+};
+
 /**
  * @param {Array|arguments} value
  * @param {Function} argProcessor
  * @returns props object
  */
 const parseProps = (value = [], argProcessor, path, prevKey) => {
-  const firstArg = value[1];
-  const hasProps = isPlainObject(firstArg)
-    && !isType(firstArg, valueTypes.vnode);
-  const props = hasProps ? firstArg : emptyObj;
-  const skipValues = hasProps ? 2 : 1;
+  const props = getPropsFromArgs(value);
   const lastDotIndex = path.lastIndexOf('.');
   const { key = prevKey } = props;
   const refId = isDef(key)
@@ -154,27 +158,16 @@ const parseProps = (value = [], argProcessor, path, prevKey) => {
       key,
     )
     : path;
+  const hasProps = props !== emptyObj;
+  const skipValues = hasProps ? 2 : 1;
   const args = prepareArgs(
     value, argProcessor, refId, skipValues,
   );
-  const childrenLength = args.length;
-  const children = childrenLength > 0
-    ? args
-    : props.children;
-  const hasDuplicateChildrenProps = childrenLength > 0
-    && props.children;
-
-  if (hasDuplicateChildrenProps) {
-    throw new Error(
-      'You may not have both a children prop and children arguments',
-    );
-  }
-
   const baseConfig = {
     key: validateKey(key),
     props: {
       $$refId: refId,
-      children,
+      children: args,
     },
   };
 
