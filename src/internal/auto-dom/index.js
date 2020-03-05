@@ -171,7 +171,7 @@ const parseProps = (value = [], argProcessor, path, prevKey) => {
   }
 
   const baseConfig = {
-    key,
+    key: validateKey(key),
     props: {
       $$refId: refId,
       children,
