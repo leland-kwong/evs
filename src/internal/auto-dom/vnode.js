@@ -189,11 +189,13 @@ function coerceToVnode(newChildren, value) {
 
 const createVnode = (tagName, config) => {
   const { props } = config;
-  const { key } = config;
   const {
-    children = emptyArr,
+    key,
     // special snabbdom hooks
     $$hook: elementHooks = emptyObj,
+  } = config;
+  const {
+    children = emptyArr,
   } = props;
   const childArray = !isArray(children) ? [children] : children;
   const hasNestedCollections = childArray.find(isArray);

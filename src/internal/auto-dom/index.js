@@ -83,51 +83,50 @@ const prepareArgs = (
   return args;
 };
 
+const createHookTransformer = (type) =>
+  (config, key, value) =>
+    setValue(config.$$hook, type, value);
+
 const propTransformer = {
   /**
    * don't transfer over key since it is for
    * internal use only
    */
   key() {},
-  hookInit(props, key, value) {
-    setValue(props.$$hook, 'init', value);
-  },
-  hookCreate(props, key, value) {
-    setValue(props.$$hook, 'create', value);
-  },
-  hookUpdate(props, key, value) {
-    setValue(props.$$hook, 'update', value);
-  },
-  hookDestroy(props, key, value) {
-    setValue(props.$$hook, 'destroy', value);
-  },
+  hookInit: createHookTransformer('init'),
+  hookCreate: createHookTransformer('create'),
+  hookUpdate: createHookTransformer('update'),
+  hookDestroy: createHookTransformer('destroy'),
 };
 
 /**
  * Mutates the source by applying transformations
  * and remapping as necessary
  */
-const transformProps = (
-  source, config,
+const transformConfig = (
+  config, props,
 ) => {
-  const src = source;
-  const keys = Object.keys(config);
+  const keys = Object.keys(props || emptyObj);
+  const c = config;
+  c.$$hook = config.$$hook || {};
 
   let i = 0;
   while (i < keys.length) {
     const k = keys[i];
-    const v = config[k];
+    const v = props[k];
     const transformer = propTransformer[k];
 
     if (transformer) {
-      transformer(src, k, v);
+      transformer(config, k, v);
     } else {
-      src[k] = v;
+      // transfer rest onto config props
+      const p = config.props;
+      p[k] = v;
     }
     i += 1;
   }
 
-  return src;
+  return config;
 };
 
 /**
@@ -176,13 +175,12 @@ const parseProps = (value = [], argProcessor, path, prevKey) => {
   const baseConfig = {
     key,
     props: {
-      $$hook: {},
       $$refId: refId,
       children,
     },
   };
 
-  transformProps(baseConfig.props, props);
+  transformConfig(baseConfig, props);
   return baseConfig;
 };
 
@@ -329,7 +327,7 @@ const renderWith = (
  * New children will replace existing children.
  */
 const cloneElement = (...args) => {
-  const [element, config, children = []] = args;
+  const [element, config, children] = args;
 
   if (!isType(element, valueTypes.vnode)) {
     throw new Error(
@@ -337,15 +335,12 @@ const cloneElement = (...args) => {
     );
   }
 
-  const { sel } = element;
+  const { sel, key } = element;
   const props = config
-    ? transformProps(
-      { ...element.props },
-      config,
-    )
+    ? { ...element.props }
     // keep original
     : element.props;
-
+  const newConfig = { key, props };
   const childrenLength = args.length - 2;
 
   if (childrenLength === 1) {
@@ -358,11 +353,7 @@ const cloneElement = (...args) => {
     props.children = childArray;
   }
 
-  const newConfig = {
-    key: element.key,
-    props,
-  };
-
+  transformConfig(newConfig, config);
   return createVnode(sel, newConfig);
 };
 
