@@ -195,16 +195,14 @@ const processLisp = (value, path, prevKey, prevCtor) => {
 
   if (!isLispLike) {
     if (isList) {
-      return value.map((v, defaultKey) => {
-        const refId = addToRefId(path, defaultKey);
+      return value.map((v, defaultKey) =>
         /**
          * @important
          * We set default key as the index so when
          * siblings are shuffled, form controls
          * can still maintain their focus.
          */
-        return processLisp(v, refId, defaultKey);
-      });
+        processLisp(v, path, defaultKey));
     }
 
     return value;
