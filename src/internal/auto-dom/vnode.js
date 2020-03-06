@@ -181,12 +181,63 @@ function coerceToVnode(newChildren, value) {
   return newChildren;
 }
 
+const builtinHooks = {
+  init(vnode) {
+    console.log('[init]', vnode.ctor.name, vnode);
+    const { customHooks } = vnode.data;
+    if (customHooks && customHooks.init) {
+      customHooks.init(vnode);
+    }
+  },
+  update(oldVnode, vnode) {
+    /**
+     * This check helps differentiate if it was
+     * a true update or that it was a component switch.
+     */
+    const isComponentSwitch = oldVnode.ctor !== vnode.ctor
+      /**
+       * snabbdom provides an empty vnode on the first
+       * `patch` call. We know how the vnode was created
+       * by checking the `type` property because it is
+       * added by our own api.
+       */
+      && isType(oldVnode, valueTypes.vnode);
+    if (isComponentSwitch) {
+      /**
+       * @TODO
+       * This is where we should trigger a `destroy` hook for
+       * the old vnode, and an `init` hook for the new vnode.
+       */
+      console.log(
+        '[update -> new_component]',
+        '\n\n',
+        oldVnode.ctor,
+        '\n\n',
+        vnode.ctor,
+      );
+      return;
+    }
+
+    const { customHooks } = vnode.data;
+    if (customHooks && customHooks.update) {
+      customHooks.update(oldVnode, vnode);
+    }
+  },
+  destroy(oldVnode) {
+    console.log('[destroy]', oldVnode);
+    const { customHooks } = oldVnode.data;
+    if (customHooks && customHooks.destroy) {
+      customHooks.destroy(oldVnode);
+    }
+  },
+};
+
 const createVnode = (tagName, config) => {
   const { props } = config;
   const {
     // special snabbdom hooks
-    $$hook: elementHooks = emptyObj,
-    fn,
+    $$hook: customHooks = emptyObj,
+    ctor,
   } = config;
   const {
     key,
@@ -204,7 +255,8 @@ const createVnode = (tagName, config) => {
     props,
     key,
     data: {
-      hook: elementHooks,
+      customHooks,
+      hook: builtinHooks,
       handleProp,
     },
     text: isComment
@@ -215,7 +267,7 @@ const createVnode = (tagName, config) => {
       : flattendChildren
         .reduce(coerceToVnode, []),
     type: valueTypes.vnode,
-    fn,
+    ctor,
   };
 };
 
