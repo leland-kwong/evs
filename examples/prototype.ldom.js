@@ -33,23 +33,30 @@ const Greeting = (props) => {
   );
 };
 
-const Fragment = () =>
-  ([A.div,
-    [A.div, 'a'],
-    1,
-    [A.div, 'b'],
-  ]);
+const Recursive = ({ chars }) => {
+  if (!chars.length) {
+    return null;
+  }
 
-console.log(
-  createElement([Fragment], '@fragment'),
-);
+  const [, ...rest] = chars;
+  return ([
+    (chars.map((c) =>
+      [A.div, c])),
+    [Recursive, { chars: rest }],
+  ]);
+};
+
+// console.log(
+//   createElement([Fragment], '@fragment'),
+// );
 
 const Hello = ({ name, scope }) =>
-  ([A.div, { class: 'HelloRoot' },
+  ([A.div,
     [A.hr, { style: { height: '1px',
                       margin: '1rem 0',
                       background: '#000' } }],
     [Greeting, { name, scope }],
+    [Recursive, { chars: ['a', 'b', 'c'] }],
   ]);
 
 export {
