@@ -137,7 +137,7 @@ const getPropsFromArgs = (value) => {
  * @param {Function} argProcessor
  * @returns props object
  */
-const parseProps = (value = [], argProcessor, path, prevKey, fn) => {
+const parseProps = (value = [], argProcessor, path, prevKey, ctor) => {
   const props = getPropsFromArgs(value);
   const lastDotIndex = path.lastIndexOf('.');
   const { key = prevKey } = props;
@@ -164,7 +164,7 @@ const parseProps = (value = [], argProcessor, path, prevKey, fn) => {
       $$refId: refId,
       children: args,
     },
-    fn,
+    ctor,
   };
 
   transformConfig(baseConfig, props);
@@ -184,7 +184,7 @@ const getLispFunc = (lisp) =>
  * that transferred through from a previous functional
  * component call.
  */
-const processLisp = (value, path, prevKey, originatorFn) => {
+const processLisp = (value, path, prevKey, prevCtor) => {
   const isList = isArray(value);
   /**
    * lisp structure is:
@@ -220,18 +220,18 @@ const processLisp = (value, path, prevKey, originatorFn) => {
   const isDomComp = isType(
     f, valueTypes.domComponent,
   );
-  const nextOriginator = originatorFn || (isDomComp ? null : f);
+  const nextCtor = prevCtor || f;
   const argProcessor = isDomComp
     // only eagerly process vnode functions
     ? processLisp : identity;
   const config = parseProps(
-    value, argProcessor, path, prevKey, nextOriginator,
+    value, argProcessor, path, prevKey, nextCtor,
   );
   const fInput = isDomComp ? config : config.props;
   const nextValue = f(fInput, path);
   const { props: { key = prevKey, $$refId } } = config;
 
-  return processLisp(nextValue, $$refId, key, nextOriginator);
+  return processLisp(nextValue, $$refId, key, nextCtor);
 };
 
 const validateSeedPath = (seedPath) => {
@@ -328,12 +328,12 @@ const cloneElement = (...args) => {
     );
   }
 
-  const { sel, fn } = element;
+  const { sel, ctor } = element;
   const props = config
     ? { ...element.props }
     // keep original
     : element.props;
-  const newConfig = { props, fn };
+  const newConfig = { props, ctor };
   const childrenLength = args.length - 2;
 
   if (childrenLength === 1) {
