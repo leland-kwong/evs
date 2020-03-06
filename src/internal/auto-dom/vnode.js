@@ -75,12 +75,6 @@ const handleProp = Object.freeze({
     );
   },
 
-  /*
-   * TODO:
-   * We should probably setup the synthetic event system
-   * so we can do more advance event handling that the
-   * traditional system can't do for us.
-   */
   // setup builtin dom event types
   ...[
     ...getSupportedEventTypes(),
@@ -190,11 +184,12 @@ function coerceToVnode(newChildren, value) {
 const createVnode = (tagName, config) => {
   const { props } = config;
   const {
-    key,
     // special snabbdom hooks
     $$hook: elementHooks = emptyObj,
+    fn,
   } = config;
   const {
+    key,
     children = emptyArr,
   } = props;
   const childArray = !isArray(children) ? [children] : children;
@@ -208,11 +203,6 @@ const createVnode = (tagName, config) => {
     sel: tagName,
     props,
     key,
-    /*
-     * TODO:
-     * Check if `data` property is necessary for
-     * snabbdom to work
-     */
     data: {
       hook: elementHooks,
       handleProp,
@@ -225,6 +215,7 @@ const createVnode = (tagName, config) => {
       : flattendChildren
         .reduce(coerceToVnode, []),
     type: valueTypes.vnode,
+    fn,
   };
 };
 

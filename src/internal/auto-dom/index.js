@@ -88,11 +88,6 @@ const createHookTransformer = (type) =>
     setValue(config.$$hook, type, value);
 
 const propTransformer = {
-  /**
-   * don't transfer over key since it is for
-   * internal use only
-   */
-  key() {},
   hookInit: createHookTransformer('init'),
   hookCreate: createHookTransformer('create'),
   hookUpdate: createHookTransformer('update'),
@@ -142,7 +137,7 @@ const getPropsFromArgs = (value) => {
  * @param {Function} argProcessor
  * @returns props object
  */
-const parseProps = (value = [], argProcessor, path, prevKey) => {
+const parseProps = (value = [], argProcessor, path, prevKey, fn) => {
   const props = getPropsFromArgs(value);
   const lastDotIndex = path.lastIndexOf('.');
   const { key = prevKey } = props;
@@ -164,11 +159,12 @@ const parseProps = (value = [], argProcessor, path, prevKey) => {
     value, argProcessor, refId, skipValues,
   );
   const baseConfig = {
-    key: validateKey(key),
     props: {
+      key: validateKey(key),
       $$refId: refId,
       children: args,
     },
+    fn,
   };
 
   transformConfig(baseConfig, props);
@@ -188,7 +184,7 @@ const getLispFunc = (lisp) =>
  * that transferred through from a previous functional
  * component call.
  */
-const processLisp = (value, path, prevKey) => {
+const processLisp = (value, path, prevKey, originatorFn) => {
   const isList = isArray(value);
   /**
    * lisp structure is:
@@ -224,17 +220,18 @@ const processLisp = (value, path, prevKey) => {
   const isDomComp = isType(
     f, valueTypes.domComponent,
   );
+  const nextOriginator = originatorFn || (isDomComp ? null : f);
   const argProcessor = isDomComp
     // only eagerly process vnode functions
     ? processLisp : identity;
   const config = parseProps(
-    value, argProcessor, path, prevKey,
+    value, argProcessor, path, prevKey, nextOriginator,
   );
   const fInput = isDomComp ? config : config.props;
   const nextValue = f(fInput, path);
-  const { key = prevKey, props: { $$refId } } = config;
+  const { props: { key = prevKey, $$refId } } = config;
 
-  return processLisp(nextValue, $$refId, key);
+  return processLisp(nextValue, $$refId, key, nextOriginator);
 };
 
 const validateSeedPath = (seedPath) => {
@@ -331,12 +328,12 @@ const cloneElement = (...args) => {
     );
   }
 
-  const { sel, key } = element;
+  const { sel, fn } = element;
   const props = config
     ? { ...element.props }
     // keep original
     : element.props;
-  const newConfig = { key, props };
+  const newConfig = { props, fn };
   const childrenLength = args.length - 2;
 
   if (childrenLength === 1) {
