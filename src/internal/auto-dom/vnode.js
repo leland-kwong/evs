@@ -183,7 +183,7 @@ function coerceToVnode(newChildren, value) {
 
 const builtinHooks = {
   init(vnode) {
-    console.log('[init]', vnode.ctor.name, vnode);
+    // console.log('[init]', vnode.ctor.name, vnode);
     const { customHooks } = vnode.data;
     if (customHooks && customHooks.init) {
       customHooks.init(vnode);
@@ -208,13 +208,13 @@ const builtinHooks = {
        * This is where we should trigger a `destroy` hook for
        * the old vnode, and an `init` hook for the new vnode.
        */
-      console.log(
-        '[update -> new_component]',
-        '\n\n',
-        oldVnode.ctor,
-        '\n\n',
-        vnode.ctor,
-      );
+      // console.log(
+      //   '[update -> new_component]',
+      //   '\n\n',
+      //   oldVnode.ctor,
+      //   '\n\n',
+      //   vnode.ctor,
+      // );
       return;
     }
 
@@ -224,7 +224,7 @@ const builtinHooks = {
     }
   },
   destroy(oldVnode) {
-    console.log('[destroy]', oldVnode);
+    // console.log('[destroy]', oldVnode);
     const { customHooks } = oldVnode.data;
     if (customHooks && customHooks.destroy) {
       customHooks.destroy(oldVnode);
