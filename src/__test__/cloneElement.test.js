@@ -4,68 +4,98 @@ import {
   createElement,
 } from '../internal/auto-dom';
 
+const seedPath = 'abc';
+
 describe('cloneElement', () => {
   test('clone with null value', () => {
-    const Null = () =>
+    const baseComponent = () =>
       null;
-    const element = createElement([Null], 'abc');
 
-    expect(() => {
-      cloneElement(element);
-    }).toThrow();
+    expect(
+      createElement([
+        cloneElement,
+        [baseComponent],
+      ], seedPath),
+    ).toEqual(
+      createElement(
+        [baseComponent],
+        seedPath,
+      ),
+    );
   });
 
   test('clone with primitive value', () => {
-    const Primitive = () =>
+    const baseComponent = () =>
       1;
-    const element = createElement([Primitive], 'abc');
 
-    expect(() => {
-      cloneElement(element);
-    }).toThrow();
+    expect(
+      createElement([
+        cloneElement,
+        [baseComponent],
+      ], seedPath),
+    ).toEqual(
+      createElement(
+        [baseComponent],
+        seedPath,
+      ),
+    );
   });
 
   test('clone with no new changes', () => {
-    const LazyComponent = [A.div, 1, 2];
-    const element = createElement(LazyComponent, 'abc');
+    const baseComponent = () =>
+      [A.div, 1, 2];
 
     expect(
-      cloneElement(element),
+      createElement([
+        cloneElement,
+        [baseComponent],
+      ], seedPath),
     ).toEqual(
-      createElement(LazyComponent, 'abc'),
+      createElement(
+        [baseComponent],
+        seedPath,
+      ),
     );
   });
 
   test('clone extends original props', () => {
     const baseProps = { foo: 'foo' };
     const newProps = { bar: 'bar' };
-    const element = createElement(
-      [A.div, baseProps, 1, 2], 'abc',
-    );
+    const baseComponent = (props) =>
+      [A.div, props, 1, 2];
 
     expect(
-      cloneElement(element, newProps),
+      createElement(
+        [cloneElement,
+          [baseComponent, baseProps],
+          newProps],
+        seedPath,
+      ),
     ).toEqual(
       createElement(
-        [A.div,
-          { ...baseProps, ...newProps }, 1, 2],
-        'abc',
+        [baseComponent,
+          { ...baseProps, ...newProps }],
+        seedPath,
       ),
     );
   });
 
   test('clone replaces children with new children', () => {
-    const element = createElement(
-      [A.div, 1, 2],
-      'abc',
-    );
+    const BaseComponent = ({ children }) =>
+      [A.div, children];
 
     expect(
-      cloneElement(element, null, 3),
+      createElement(
+        [cloneElement,
+          [BaseComponent, 1, 2],
+          3].children,
+        seedPath,
+      ),
     ).toEqual(
       createElement(
-        [A.div, 3],
-        'abc',
+        [BaseComponent, 3]
+          .children,
+        seedPath,
       ),
     );
   });

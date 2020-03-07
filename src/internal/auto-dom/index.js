@@ -11,6 +11,10 @@ import snabbdomProps from './snabbdom-modules/props';
 import { elementTypes } from '../element-types';
 import {
   createVnode,
+  createTextVnode,
+  primitiveTypes,
+  ignoredValues,
+  validateVnodeValue,
 } from './vnode';
 import { string } from '../string';
 import { isArray, isFunc,
@@ -18,7 +22,7 @@ import { isArray, isFunc,
   stringifyValueForLogging,
   setValue,
   identity } from '../utils';
-import { emptyObj, emptyArr } from '../../constants';
+import { emptyArr } from '../../constants';
 import * as valueTypes from './value-types';
 
 const { isType } = valueTypes;
@@ -101,6 +105,10 @@ const propTransformer = {
   hookDestroy: createHookTransformer('destroy'),
 };
 
+const emptyProps = Object.freeze({
+  empty: true,
+});
+
 /**
  * Mutates the source by applying transformations
  * and remapping as necessary
@@ -108,7 +116,7 @@ const propTransformer = {
 const transformConfig = (
   config, props,
 ) => {
-  const keys = Object.keys(props || emptyObj);
+  const keys = Object.keys(props || emptyProps);
   const c = config;
   c.$$hook = config.$$hook || {};
 
@@ -136,7 +144,7 @@ const getPropsFromArgs = (value) => {
   const hasProps = isPlainObject(firstArg)
     && !isType(firstArg, valueTypes.vnode);
 
-  return hasProps ? firstArg : emptyObj;
+  return hasProps ? firstArg : emptyProps;
 };
 
 /**
@@ -160,8 +168,7 @@ const parseProps = (value = [], argProcessor, path, prevKey, ctor) => {
       key,
     )
     : path;
-  const hasProps = props !== emptyObj;
-  const skipValues = hasProps ? 2 : 1;
+  const skipValues = !props.empty ? 2 : 1;
   const args = prepareArgs(
     value, argProcessor, refId, skipValues,
   );
@@ -192,6 +199,18 @@ const getLispFunc = (lisp) =>
  * component call.
  */
 const processLisp = (value, path, prevKey, prevCtor) => {
+  const $type = typeof value;
+
+  if (primitiveTypes.has($type)) {
+    return createTextVnode(value);
+  }
+
+  if (ignoredValues.has(value)) {
+    return createVnode('!',
+      { props: emptyProps,
+        children: String(value) });
+  }
+
   const isList = isArray(value);
   /**
    * lisp structure is:
@@ -210,10 +229,13 @@ const processLisp = (value, path, prevKey, prevCtor) => {
          * still maintain their focus.
          */
         const nextPath = addToRefId(path, defaultKey);
-        return processLisp(v, nextPath, defaultKey, prevCtor);
+        return processLisp(
+          v, nextPath, defaultKey, prevCtor,
+        );
       });
     }
 
+    validateVnodeValue(value);
     return value;
   }
 
@@ -323,35 +345,36 @@ const renderWith = (
 };
 
 /**
- * Extend an element, by assign new props.
+ * Extends a component, by assigning new props
+ * to the component.
  * New children will replace existing children.
  */
-const cloneElement = (...args) => {
-  const [element, config, children] = args;
+const cloneElement = ({ children: extendWith, $$refId }) => {
+  const [baseComponent] = extendWith;
+  const baseConfig = getPropsFromArgs(baseComponent);
+  const [baseCtor] = baseComponent;
+  const config = getPropsFromArgs(extendWith);
+  const newChildren = !config.empty
+    ? extendWith.slice(2)
+    : extendWith.slice(1);
+  const baseVnode = createElement(
+    [baseCtor, baseConfig, ...newChildren],
+    $$refId,
+  );
+  const isTextNode = valueTypes
+    .isType(baseVnode, valueTypes.vnodeText);
 
-  if (!isType(element, valueTypes.vnode)) {
-    throw new Error(
-      '[cloneElement] Element must be a vnode',
-    );
+  if (isTextNode) {
+    return baseVnode;
   }
 
-  const { sel, ctor } = element;
-  const props = config
-    ? { ...element.props }
-    // keep original
-    : element.props;
+  const { sel, ctor } = baseVnode;
+  const { props: oProps } = baseVnode;
+  const props = {
+    ...oProps,
+    ...config,
+  };
   const newConfig = { props, ctor };
-  const childrenLength = args.length - 2;
-
-  if (childrenLength === 1) {
-    props.children = [children];
-  } else if (childrenLength > 1) {
-    const childArray = Array(childrenLength);
-    for (let i = 0; i < childrenLength; i += 1) {
-      childArray[i] = args[i + 2];
-    }
-    props.children = childArray;
-  }
 
   transformConfig(newConfig, config);
   return createVnode(sel, newConfig);

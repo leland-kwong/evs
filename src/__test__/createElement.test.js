@@ -31,12 +31,18 @@ describe('createElement', () => {
     const Component = ({ myProp }) =>
       [A.div, myProp];
     const element = createElement(
-      [Component, { myProp: 'foo' }], seedPath,
+      [Component, { myProp: 'foo' }],
+      seedPath,
     );
 
     expect(
       element.props.children[0],
-    ).toBe('foo');
+    ).toEqual(
+      createElement(
+        [A.div, 'foo'],
+        seedPath,
+      ).children[0],
+    );
   });
 
   describe('Functional component', () => {
@@ -245,7 +251,7 @@ describe('createElement', () => {
       const parentKey = '@recursive';
       const Recursive = ({ chars }) => {
         if (!chars.length) {
-          return null;
+          return [];
         }
 
         const [, ...rest] = chars;
@@ -261,18 +267,18 @@ describe('createElement', () => {
         seedPath,
       );
 
-      const reduceToKeys = (v) =>
-        v.reduce((treeOfKeys, vnode) => {
+      const toKeysTree = (v) =>
+        v.reduce((tree, vnode) => {
           if (isArray(vnode)) {
-            treeOfKeys.push(reduceToKeys(vnode));
+            tree.push(toKeysTree(vnode));
           } else if (valueTypes.isType(vnode, valueTypes.vnode)) {
-            treeOfKeys.push(vnode.key);
+            tree.push(vnode.key);
           }
-          return treeOfKeys;
+          return tree;
         }, []);
 
       expect(
-        reduceToKeys(value),
+        toKeysTree(value),
       ).toEqual([
         [
           [seedPath, parentKey, 0, 0].join('.'),
@@ -282,6 +288,7 @@ describe('createElement', () => {
           [
             [seedPath, parentKey, 1, 0, 0].join('.'),
           ],
+          [],
         ],
       ]);
     });

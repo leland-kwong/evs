@@ -96,7 +96,7 @@ const handleProp = Object.freeze({
   }, {}),
 });
 
-const validateValue = (value) => {
+const validateVnodeValue = (value) => {
   const isFuncChild = isFunc(value);
 
   if (isFuncChild) {
@@ -111,7 +111,8 @@ const validateValue = (value) => {
   }
 
   const isObjectChild = typeof value === 'object'
-    && !isType(value, valueTypes.vnode);
+    && !isType(value, valueTypes.vnode)
+    && !isType(value, valueTypes.vnodeText);
 
   if (isObjectChild) {
     const stringified = stringifyValueForLogging(value);
@@ -139,7 +140,7 @@ const validateValue = (value) => {
 function createTextVnode(value) {
   return {
     text: value,
-    type: valueTypes.vnode,
+    type: valueTypes.vnodeText,
   };
 }
 
@@ -154,32 +155,6 @@ const primitiveTypes = new Set([
   'string',
   'number',
 ]);
-
-function coerceToVnode(newChildren, value) {
-  if (ignoredValues.has(value)) {
-    return newChildren;
-  }
-
-  if (isType(value, valueTypes.vnode)) {
-    newChildren.push(value);
-    return newChildren;
-  }
-
-  const isPrimitive = primitiveTypes
-    .has(typeof value);
-  if (isPrimitive) {
-    newChildren.push(
-      createTextVnode(value),
-    );
-    return newChildren;
-  }
-
-  if (process.env.NODE_ENV === 'development') {
-    validateValue(value);
-  }
-
-  return newChildren;
-}
 
 const builtinHooks = {
   init(vnode) {
@@ -245,7 +220,7 @@ const createVnode = (tagName, config) => {
   } = props;
   const childArray = !isArray(children) ? [children] : children;
   const hasNestedCollections = childArray.find(isArray);
-  const flattendChildren = hasNestedCollections
+  const flattenedChildren = hasNestedCollections
     ? childArray.flat(Infinity)
     : childArray;
   const isComment = tagName === '!';
@@ -267,12 +242,11 @@ const createVnode = (tagName, config) => {
       handleProp,
     },
     text: isComment
-      ? flattendChildren.join('')
+      ? flattenedChildren.join('')
       : undefined,
     children: isComment
       ? emptyArr
-      : flattendChildren
-        .reduce(coerceToVnode, []),
+      : flattenedChildren,
     type: valueTypes.vnode,
     ctor,
   };
@@ -281,5 +255,5 @@ const createVnode = (tagName, config) => {
 export {
   createVnode, createTextVnode,
   ignoredValues, primitiveTypes,
-  getDomNode,
+  getDomNode, validateVnodeValue,
 };
