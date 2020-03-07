@@ -1,7 +1,7 @@
 /* global */
 
 import * as evs from '../src';
-import { nativeElements as A, createElement } from '../src/internal/auto-dom';
+import { nativeElements as A } from '../src/internal/auto-dom';
 
 function SetName(name) {
   return {
@@ -33,30 +33,12 @@ const Greeting = (props) => {
   );
 };
 
-const Recursive = ({ chars }) => {
-  if (!chars.length) {
-    return null;
-  }
-
-  const [, ...rest] = chars;
-  return ([
-    (chars.map((c) =>
-      [A.div, c])),
-    [Recursive, { chars: rest }],
-  ]);
-};
-
-// console.log(
-//   createElement([Fragment], '@fragment'),
-// );
-
 const Hello = ({ name, scope }) =>
   ([A.div,
     [A.hr, { style: { height: '1px',
                       margin: '1rem 0',
                       background: '#000' } }],
     [Greeting, { name, scope }],
-    [Recursive, { chars: ['a', 'b', 'c'] }],
   ]);
 
 export {

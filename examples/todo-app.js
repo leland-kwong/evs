@@ -2,7 +2,7 @@ import { css } from 'emotion';
 import * as atomicState from 'atomic-state';
 import { nativeElements as A,
   createElement,
-  cloneElement,
+  CloneElement,
   renderWith,
   valueTypes } from '../src/internal/auto-dom';
 import { ignoredValues } from '../src/internal/auto-dom/vnode';
@@ -26,7 +26,7 @@ const initialModel = {
     text: '',
     completed: false,
   },
-  items: Array(6).fill(0)
+  items: Array(2).fill(0)
     .reduce((itemsByKey, _, index) => {
       const i = itemsByKey;
       const key = uid();
@@ -117,7 +117,7 @@ const smartComponentHooks = {
      * We need to transfer the key over to the newly
      * rendered vnode
      */
-    const { key, props: { $$refId } } = initialVnode;
+    const { props: { $$refId, key } } = initialVnode;
     const { render, model, modelRefKey, props } = config;
     let oldVnode = initialVnode;
     const component = (
@@ -164,8 +164,12 @@ const WithHooks = (config) => {
     hookDestroy: (vnode) =>
       onDestroy(vnode, renderConfig),
   };
+  const baseComponent = [render, renderConfig];
   const renderValue = createElement(
-    [render, renderConfig], $$refId,
+    [CloneElement,
+      baseComponent,
+      rootConfig],
+    $$refId,
   );
 
   modelsByRefId.set(modelRefKey, modelRef);
@@ -182,7 +186,7 @@ const WithHooks = (config) => {
 
   // null, false, true, undefined
   if (ignoredValues.has(renderValue)) {
-    return [A.comment, rootConfig, $$refId];
+    return [A.comment, rootConfig];
   }
 
   // primitive values
@@ -192,9 +196,7 @@ const WithHooks = (config) => {
     return [A.span, rootConfig, renderValue];
   }
 
-  return cloneElement(
-    renderValue, rootConfig,
-  );
+  return renderValue;
 };
 
 const Title = (
@@ -230,14 +232,20 @@ const TodoItem = ({ key, value, onTodoChange }) => {
                 onInput: changeText }]);
 
   return (
-    [A.li, { class: itemStyle },
-      completedField, ' ', textField]);
+    [A.li, { class: itemStyle,
+             hookInit(vnode) {
+               //  console.log('[todoItem init]', vnode);
+             } },
+    completedField, ' ', textField]);
 };
 
 const TodoList = ({ items = [] }) =>
-  ([A.ul, { class: cl.list },
+  ([A.ul,
+    { class: cl.list,
+      key: '@TodoList' },
+
     items.map((props) =>
-      // doing it this way adds the key to the props
+    // doing it this way adds the key to the props
       [TodoItem, props])]);
 
 const NewTodo = ({ onNewTodoCreate, onNewTodoChange, newTodo }) => {
@@ -258,13 +266,18 @@ const NewTodo = ({ onNewTodoCreate, onNewTodoChange, newTodo }) => {
       newTodoField]);
 };
 
-const SortOptions = ({ onSortChange }) => {
+const SortOptions = ({ onSortChange, sortBy }) => {
   const SortBtn = ({ direction }) => {
     const description = direction;
+    const selected = direction === sortBy;
 
     return (
       [A.button,
         { type: 'button',
+          class: css`
+            background: ${selected ? '#3a88fd' : 'none'};
+            color: ${selected ? 'white' : 'none'};
+          `,
           onClick: () =>
             onSortChange({ direction }) },
         description]);
@@ -276,7 +289,7 @@ const SortOptions = ({ onSortChange }) => {
       [SortBtn, { direction: 'desc' }]]);
 };
 
-const Main = ({ model }) => {
+const TodoMain = ({ model }) => {
   const onTodoChange = (payload) =>
     swap(model, updateTodo, payload);
   const onNewTodoCreate = (payload) =>
@@ -289,13 +302,13 @@ const Main = ({ model }) => {
 
   return (
     [A.div,
-      [Title],
+      Title,
       [NewTodo, {
         onNewTodoCreate,
         onNewTodoChange,
         newTodo,
       }],
-      [SortOptions, { onSortChange }],
+      [SortOptions, { onSortChange, sortBy }],
       [TodoList,
         { items: transformItems(items, sortBy)
           .map(([key, value]) =>
@@ -307,6 +320,6 @@ const TodoApp = () =>
   ([WithHooks,
     { props: {},
       model: todosModel,
-      render: Main }]);
+      render: TodoMain }]);
 
 export { TodoApp };
