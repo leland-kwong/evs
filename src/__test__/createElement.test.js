@@ -1,9 +1,11 @@
 import {
   nativeElements as A,
   createElement,
+  valueTypes,
 } from '../internal/auto-dom';
+import { isArray } from '../internal/utils';
 
-const seedPath = 'withKey';
+const seedPath = 'seedPath';
 
 describe('createElement', () => {
   describe('error when invalid seed path', () => {
@@ -67,7 +69,7 @@ describe('createElement', () => {
             .children[0]
             .children[0].props.$$refId,
         ).toEqual(
-          [seedPath, 0, 0].join('.'),
+          [seedPath, 0, 0, 0].join('.'),
         );
 
         expect(
@@ -75,7 +77,84 @@ describe('createElement', () => {
             .children[0]
             .children[1].props.$$refId,
         ).toEqual(
-          [seedPath, 0, 1].join('.'),
+          [seedPath, 0, 0, 1].join('.'),
+        );
+      });
+    });
+
+    describe('fragment', () => {
+      test('fragment', () => {
+        const Fragment = () =>
+          ([
+            [A.div],
+            [A.div],
+          ]);
+        const value = createElement(
+          [Fragment], seedPath,
+        );
+
+        expect(
+          value.map((vnode) =>
+            vnode.key),
+        ).toEqual(
+          [
+            [seedPath, 0].join('.'),
+            [seedPath, 1].join('.'),
+          ],
+        );
+      });
+
+      test('keyed fragment', () => {
+        const parentKey = '@fragment';
+        const Fragment = () =>
+          ([
+            [A.div],
+            [A.div],
+          ]);
+        const value = createElement(
+          [Fragment, { key: parentKey }],
+          seedPath,
+        );
+
+        expect(
+          value.map((vnode) =>
+            vnode.key),
+        ).toEqual(
+          [
+            [seedPath, parentKey, 0].join('.'),
+            [seedPath, parentKey, 1].join('.'),
+          ],
+        );
+      });
+
+      test('multiple keyed fragments as siblings', () => {
+        const Fragment = () =>
+          ([
+            [A.div],
+            [A.div],
+          ]);
+        const MultiFragment = () =>
+          ([
+            [Fragment, { key: 'parent-1' }],
+            [Fragment, { key: 'parent-2' }],
+          ]);
+
+        const value = createElement(
+          [MultiFragment],
+          seedPath,
+        );
+
+        expect(
+          value.flat().map((vnode) =>
+            vnode.key),
+        ).toEqual(
+          [
+            [seedPath, 'parent-1', 0].join('.'),
+            [seedPath, 'parent-1', 1].join('.'),
+
+            [seedPath, 'parent-2', 0].join('.'),
+            [seedPath, 'parent-2', 1].join('.'),
+          ],
         );
       });
     });
@@ -92,7 +171,7 @@ describe('createElement', () => {
     test('key transfers through to vnode', () => {
       expect(
         element.key,
-      ).toBe(key);
+      ).toBe([seedPath, key].join('.'));
     });
   });
 
@@ -160,6 +239,51 @@ describe('createElement', () => {
             [Component, { value: 3, key: 2 }],
           ], seedPath),
         );
+    });
+
+    test('recursive list with keys', () => {
+      const parentKey = '@recursive';
+      const Recursive = ({ chars }) => {
+        if (!chars.length) {
+          return null;
+        }
+
+        const [, ...rest] = chars;
+        return ([
+          (chars.map((c) =>
+            [A.div, c])),
+          [Recursive, { chars: rest }],
+        ]);
+      };
+
+      const value = createElement(
+        [Recursive, { chars: ['a', 'b'], key: parentKey }],
+        seedPath,
+      );
+
+      const reduceToKeys = (v) =>
+        v.reduce((treeOfKeys, vnode) => {
+          if (isArray(vnode)) {
+            treeOfKeys.push(reduceToKeys(vnode));
+          } else if (valueTypes.isType(vnode, valueTypes.vnode)) {
+            treeOfKeys.push(vnode.key);
+          }
+          return treeOfKeys;
+        }, []);
+
+      expect(
+        reduceToKeys(value),
+      ).toEqual([
+        [
+          [seedPath, parentKey, 0, 0].join('.'),
+          [seedPath, parentKey, 0, 1].join('.'),
+        ],
+        [
+          [
+            [seedPath, parentKey, 1, 0, 0].join('.'),
+          ],
+        ],
+      ]);
     });
 
     test('auto-expand nested lists', () => {

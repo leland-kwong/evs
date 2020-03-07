@@ -1,3 +1,10 @@
+/**
+ * @TODO
+ * Add check for reusing a vnode between two components in the tree.
+ * Snabbdom stores dom node references on vnodes, so if we share a
+ * vnode in the tree, we will have race conditions during re-renders.
+ */
+
 import isPlainObject from 'is-plain-object';
 import { init as snabbdomInit } from 'snabbdom';
 import snabbdomProps from './snabbdom-modules/props';
@@ -195,14 +202,16 @@ const processLisp = (value, path, prevKey, prevCtor) => {
 
   if (!isLispLike) {
     if (isList) {
-      return value.map((v, defaultKey) =>
+      return value.map((v, defaultKey) => {
         /**
          * @important
-         * We set default key as the index so when
-         * siblings are shuffled, form controls
-         * can still maintain their focus.
+         * We use the index as a default key so when
+         * siblings are shuffled, form controls can
+         * still maintain their focus.
          */
-        processLisp(v, path, defaultKey));
+        const nextPath = addToRefId(path, defaultKey);
+        return processLisp(v, nextPath, defaultKey, prevCtor);
+      });
     }
 
     return value;
