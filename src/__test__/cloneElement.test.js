@@ -1,19 +1,19 @@
 import {
   nativeElements as A,
-  cloneElement,
+  CloneElement,
   createElement,
 } from '../internal/auto-dom';
 
 const seedPath = 'abc';
 
-describe('cloneElement', () => {
+describe('CloneElement', () => {
   test('clone with null value', () => {
     const baseComponent = () =>
       null;
 
     expect(
       createElement([
-        cloneElement,
+        CloneElement,
         [baseComponent],
       ], seedPath),
     ).toEqual(
@@ -30,7 +30,7 @@ describe('cloneElement', () => {
 
     expect(
       createElement([
-        cloneElement,
+        CloneElement,
         [baseComponent],
       ], seedPath),
     ).toEqual(
@@ -47,7 +47,7 @@ describe('cloneElement', () => {
 
     expect(
       createElement([
-        cloneElement,
+        CloneElement,
         [baseComponent],
       ], seedPath),
     ).toEqual(
@@ -66,7 +66,7 @@ describe('cloneElement', () => {
 
     expect(
       createElement(
-        [cloneElement,
+        [CloneElement,
           [baseComponent, baseProps],
           newProps],
         seedPath,
@@ -86,7 +86,7 @@ describe('cloneElement', () => {
 
     expect(
       createElement(
-        [cloneElement,
+        [CloneElement,
           [BaseComponent, 1, 2],
           3].children,
         seedPath,

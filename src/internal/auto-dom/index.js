@@ -349,7 +349,7 @@ const renderWith = (
  * to the component.
  * New children will replace existing children.
  */
-const cloneElement = ({ children: extendWith, $$refId }) => {
+const CloneElement = ({ children: extendWith, $$refId }) => {
   const [baseComponent] = extendWith;
   const baseConfig = getPropsFromArgs(baseComponent);
   const [baseCtor] = baseComponent;
@@ -385,7 +385,7 @@ export {
   nativeElements,
   renderWith,
   createElement,
-  cloneElement,
+  CloneElement,
   valueTypes,
 };
 
