@@ -27,6 +27,7 @@
     "babel-plugin-emotion": "^10.0.28",
     "classnames": "^2.2.6",
     "clean-webpack-plugin": "^3.0.0",
+    "debug": "^4.1.1",
     "emotion": "^10.0.27",
     "eslint": "^6.1.0",
     "eslint-config-airbnb": "^18.0.1",
