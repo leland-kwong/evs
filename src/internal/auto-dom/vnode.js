@@ -159,10 +159,9 @@ const primitiveTypes = new Set([
 const builtinHooks = {
   init(vnode) {
     // console.log('[init]', vnode.ctor.name, vnode);
-    const { customHooks } = vnode.data;
-    if (customHooks && customHooks.init) {
-      customHooks.init(vnode);
-    }
+    const { customHooks = emptyArr } = vnode.data;
+    customHooks.forEach((fn) =>
+      fn('init', null, vnode));
   },
   update(oldVnode, vnode) {
     /**
@@ -193,25 +192,21 @@ const builtinHooks = {
       return;
     }
 
-    const { customHooks } = vnode.data;
-    if (customHooks && customHooks.update) {
-      customHooks.update(oldVnode, vnode);
-    }
+    const { customHooks = emptyArr } = vnode.data;
+    customHooks.forEach((fn) =>
+      fn('update', oldVnode, vnode));
   },
-  destroy(oldVnode) {
+  destroy(vnode) {
     // console.log('[destroy]', oldVnode);
-    const { customHooks } = oldVnode.data;
-    if (customHooks && customHooks.destroy) {
-      customHooks.destroy(oldVnode);
-    }
+    const { customHooks = emptyArr } = vnode.data;
+    customHooks.forEach((fn) =>
+      fn('destroy', vnode));
   },
 };
 
-const createVnode = (tagName, config) => {
+const createVnode = (tagName, config, customHooks) => {
   const { props } = config;
   const {
-    // special snabbdom hooks
-    $$hook: customHooks = emptyObj,
     ctor,
   } = config;
   const {

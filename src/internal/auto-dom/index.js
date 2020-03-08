@@ -94,17 +94,6 @@ const prepareArgs = (
   return args;
 };
 
-const createHookTransformer = (type) =>
-  (config, key, value) =>
-    setValue(config.$$hook, type, value);
-
-const propTransformer = {
-  hookInit: createHookTransformer('init'),
-  hookCreate: createHookTransformer('create'),
-  hookUpdate: createHookTransformer('update'),
-  hookDestroy: createHookTransformer('destroy'),
-};
-
 const emptyProps = Object.freeze({
   empty: true,
 });
@@ -117,22 +106,16 @@ const transformConfig = (
   config, props,
 ) => {
   const keys = Object.keys(props || emptyProps);
-  const c = config;
-  c.$$hook = config.$$hook || {};
 
   let i = 0;
   while (i < keys.length) {
     const k = keys[i];
     const v = props[k];
-    const transformer = propTransformer[k];
 
-    if (transformer) {
-      transformer(config, k, v);
-    } else {
-      // transfer rest onto config props
-      const p = config.props;
-      p[k] = v;
-    }
+    // transfer props onto config props
+    const p = config.props;
+    p[k] = v;
+
     i += 1;
   }
 
