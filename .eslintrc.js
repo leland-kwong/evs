@@ -30,7 +30,6 @@ module.exports = {
       "error",
       2,
       {
-        "ignoredNodes": ["TemplateLiteral > *"],
         "ObjectExpression": "first"
       },
     ],
