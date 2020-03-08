@@ -24,6 +24,10 @@ import { isArray, isFunc,
   identity } from '../utils';
 import { emptyArr } from '../../constants';
 import * as valueTypes from './value-types';
+import {
+  setCurrentProps,
+  setCurrentDispatcher,
+} from './render-context';
 
 const { isType } = valueTypes;
 
@@ -94,9 +98,11 @@ const prepareArgs = (
   return args;
 };
 
-const emptyProps = Object.freeze({
-  empty: true,
+const emptyProps = {};
+Object.defineProperty(emptyProps, 'empty', {
+  value: true,
 });
+Object.freeze(emptyProps);
 
 /**
  * Mutates the source by applying transformations
@@ -133,7 +139,7 @@ const getPropsFromArgs = (value) => {
 /**
  * @param {Array|arguments} value
  * @param {Function} argProcessor
- * @returns props object
+ * @returns {Object} props object
  */
 const parseProps = (value = [], argProcessor, path, prevKey, ctor) => {
   const props = getPropsFromArgs(value);
@@ -163,7 +169,6 @@ const parseProps = (value = [], argProcessor, path, prevKey, ctor) => {
     },
     ctor,
   };
-
   transformConfig(baseConfig, props);
   return baseConfig;
 };
@@ -180,6 +185,7 @@ const getLispFunc = (lisp) =>
  * @param {String | Number} prevKey The key prop
  * that transferred through from a previous functional
  * component call.
+ * @returns {Any} evaluated value
  */
 const processLisp = (value, path, prevKey, prevCtor) => {
   const $type = typeof value;
@@ -243,6 +249,8 @@ const processLisp = (value, path, prevKey, prevCtor) => {
   const nextValue = f(fInput);
   const { props: { key = prevKey, $$refId } } = config;
 
+  setCurrentProps(fInput);
+  setCurrentDispatcher(f);
   return processLisp(nextValue, $$refId, key, nextCtor);
 };
 
@@ -384,5 +392,10 @@ export {
   valueTypes,
   useHook,
 };
+
+export {
+  getCurrentProps,
+  getCurrentDispatcher,
+} from './render-context';
 
 export { getDomNode } from './vnode';

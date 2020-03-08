@@ -1,4 +1,5 @@
 import { outdent } from 'outdent';
+import createDebug from 'debug';
 import { getSupportedEventTypes } from '../../get-event-types';
 import { invalidComponentMsg } from './invalid-component-msg';
 import { string } from '../string';
@@ -7,7 +8,10 @@ import { isArray, isFunc,
 import { emptyArr } from '../../constants';
 import * as valueTypes from './value-types';
 
+const hookDebug = createDebug('vnode-hook');
+
 const hooksByRefId = new Map();
+const previousHooks = new Map();
 
 const { isType } = valueTypes;
 
@@ -164,6 +168,15 @@ const builtinHooks = {
     const customHooks = hooksByRefId.get($$refId) || emptyArr;
     customHooks.forEach(([fn]) =>
       fn('init', null, vnode));
+    previousHooks.set($$refId, customHooks);
+    hooksByRefId.delete($$refId);
+  },
+  prepatch(oldVnode, vnode) {
+    hookDebug('[prepatch]');
+    const { $$refId } = vnode.props;
+    const customHooks = hooksByRefId.get($$refId) || emptyArr;
+    customHooks.forEach(([fn]) =>
+      fn('prepatch', oldVnode, vnode));
     // hooksByRefId.delete($$refId);
   },
   update(oldVnode, vnode) {
@@ -185,7 +198,7 @@ const builtinHooks = {
        * This is where we should trigger a `destroy` hook for
        * the old vnode, and an `init` hook for the new vnode.
        */
-      // console.log(
+      // hookDebug(
       //   '[update -> new_component]',
       //   '\n\n',
       //   oldVnode.ctor,
@@ -196,25 +209,37 @@ const builtinHooks = {
       // return;
     }
 
-    const { $$refId } = vnode.props;
-    const customHooks = hooksByRefId.get($$refId) || emptyArr;
     const updateType = isComponentSwitch
       ? '[update -> new_component]' : '[update]';
+    hookDebug(updateType, oldVnode, vnode);
+
+    const { $$refId } = vnode.props;
+    const customHooks = hooksByRefId.get($$refId) || emptyArr;
     customHooks.forEach(([fn]) =>
       fn(updateType, oldVnode, vnode));
-    // hooksByRefId.delete($$refId);
+  },
+  postpatch(oldVnode, vnode) {
+    hookDebug('[postpatch]');
+    const { $$refId } = vnode.props;
+    const customHooks = hooksByRefId.get($$refId) || emptyArr;
+    customHooks.forEach(([fn]) =>
+      fn('[postpatch]', oldVnode, vnode));
+    previousHooks.set($$refId, customHooks);
+    hooksByRefId.delete($$refId);
   },
   destroy(vnode) {
+    hookDebug('[destroy]');
     const { $$refId } = vnode.props;
-    const customHooks = hooksByRefId.get($$refId)
+    const customHooks = previousHooks.get($$refId)
       || emptyArr;
     customHooks.forEach(([fn]) =>
       fn('destroy', vnode));
+    previousHooks.delete($$refId);
     hooksByRefId.delete($$refId);
   },
 };
 
-const createVnode = (tagName, config, customHooks) => {
+const createVnode = (tagName, config) => {
   const { props } = config;
   const {
     ctor,
@@ -242,7 +267,6 @@ const createVnode = (tagName, config, customHooks) => {
      */
     key: $$refId,
     data: {
-      customHooks,
       hook: builtinHooks,
       handleProp,
     },
