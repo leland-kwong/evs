@@ -40,13 +40,3 @@ export const stringifyValueForLogging = (
     return v;
   });
 };
-
-/**
- * executes a callable tuple where the
- * first argument is the function and
- * the rest are arguments
- */
-export function call(tuple) {
-  const [fn = noop, ...args] = tuple;
-  return fn(...args);
-}
