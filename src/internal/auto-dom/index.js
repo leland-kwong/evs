@@ -240,7 +240,7 @@ const processLisp = (value, path, prevKey, prevCtor) => {
     value, argProcessor, path, prevKey, nextCtor,
   );
   const fInput = isDomComp ? config : config.props;
-  const nextValue = f(fInput, path);
+  const nextValue = f(fInput);
   const { props: { key = prevKey, $$refId } } = config;
 
   return processLisp(nextValue, $$refId, key, nextCtor);
