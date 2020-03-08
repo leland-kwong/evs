@@ -2,7 +2,9 @@ import { css } from 'emotion';
 import * as atomicState from 'atomic-state';
 import { nativeElements as A,
   useHook,
-  renderWith } from '../src/internal/auto-dom';
+  renderWith,
+  getCurrentProps,
+  getCurrentDispatcher } from '../src/internal/auto-dom';
 
 const { atom, swap, read } = atomicState;
 const cl = {
@@ -114,74 +116,30 @@ const smartComponentHooks = {
      * We need to transfer the key over to the newly
      * rendered vnode
      */
-    const { props: { $$refId, key } } = rootVnode;
-    const { render, model, modelRefKey, props } = config;
+    const { render, model, refId, props } = config;
     let oldVnode = rootVnode;
     const component = (
-      [render, { props,
-                 key,
-                 model }]);
+      [render, props]);
     const renderComponent = () => {
       oldVnode = renderWith(
         oldVnode,
         component,
-        $$refId,
+        refId,
       );
     };
 
     atomicState.addWatch(
-      model, modelRefKey, renderComponent,
+      model, refId, renderComponent,
     );
   },
 
   onDestroy: (rootVnode, config) => {
-    const { model, modelRefKey } = config;
+    const { model, refId } = config;
 
     atomicState
-      .removeWatch(model, modelRefKey);
-    modelsByRefId.delete(modelRefKey);
+      .removeWatch(model, refId);
+    modelsByRefId.delete(refId);
   },
-};
-
-const WithHooks = (config) => {
-  const { $$refId, key, render,
-          props, model } = config;
-  const modelRefKey = $$refId;
-  const modelRef = modelsByRefId.get(modelRefKey) || model();
-  const renderConfig = {
-    render, props, model: modelRef, modelRefKey, key,
-  };
-  const { onUpdate,
-          onDestroy } = smartComponentHooks;
-  const hook = (type, oldVnode, vnode) => {
-    console.log('[hook]', type, oldVnode, vnode);
-
-    switch (type) {
-    case 'init':
-    case 'update':
-      return onUpdate(vnode, renderConfig);
-    case 'destroy':
-      return onDestroy(oldVnode, renderConfig);
-    default:
-      return null;
-    }
-  };
-
-  modelsByRefId.set(modelRefKey, modelRef);
-
-  /*
-  * TODO:
-  * Since we're going to be using a hooks style
-  * module system, we need to move this logic
-  * over to the lisp processor. We also only need
-  * to do this when hooks are being used because
-  * there needs to be at least a comment/span node
-  * for snabbdom to trigger it.
-  */
-
-  useHook($$refId, hook);
-
-  return [render, renderConfig];
 };
 
 const Title = (
@@ -271,7 +229,46 @@ const SortOptions = ({ onSortChange, sortBy }) => {
       [SortBtn, { direction: 'desc' }]]);
 };
 
-const TodoMain = ({ model }) => {
+const useModel = (refId) => {
+  const currentProps = getCurrentProps();
+  const render = getCurrentDispatcher();
+  console.log('[TodoMain | currentProps]', currentProps);
+  const { key: rootKey } = currentProps;
+  const model = modelsByRefId.get(refId) || todosModel();
+  const renderConfig = {
+    render,
+    props: currentProps,
+    model,
+    refId,
+    key: rootKey,
+  };
+
+  const { onUpdate,
+          onDestroy } = smartComponentHooks;
+  const hook = (type, oldVnode, vnode) => {
+    // console.log('[hook]', type, oldVnode, vnode);
+
+    switch (type) {
+    case 'init':
+    case 'update':
+      return onUpdate(vnode, renderConfig);
+    case 'destroy':
+      return onDestroy(oldVnode, renderConfig);
+    default:
+      return null;
+    }
+  };
+  useHook(refId, hook);
+  modelsByRefId.set(refId, model);
+
+  return model;
+};
+
+const TodoMain = (props) => {
+  const { $$refId } = props;
+  const model = useModel($$refId);
+  const { items = {}, newTodo, sortBy } = read(model);
+
   const onTodoChange = (payload) =>
     swap(model, updateTodo, payload);
   const onNewTodoCreate = (payload) =>
@@ -280,7 +277,6 @@ const TodoMain = ({ model }) => {
     swap(model, updateNewTodo, payload);
   const onSortChange = (payload) =>
     swap(model, changeSorting, payload);
-  const { items = {}, newTodo, sortBy } = read(model);
 
   return (
     [A.div,
@@ -298,10 +294,4 @@ const TodoMain = ({ model }) => {
     ]);
 };
 
-const TodoApp = () =>
-  ([WithHooks,
-    { props: {},
-      model: todosModel,
-      render: TodoMain }]);
-
-export { TodoApp };
+export { TodoMain as TodoApp };
