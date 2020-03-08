@@ -4,8 +4,10 @@ import { invalidComponentMsg } from './invalid-component-msg';
 import { string } from '../string';
 import { isArray, isFunc,
   setValue, stringifyValueForLogging, isDef } from '../utils';
-import { emptyObj, emptyArr } from '../../constants';
+import { emptyArr } from '../../constants';
 import * as valueTypes from './value-types';
+
+const hooksByRefId = new Map();
 
 const { isType } = valueTypes;
 
@@ -158,10 +160,11 @@ const primitiveTypes = new Set([
 
 const builtinHooks = {
   init(vnode) {
-    // console.log('[init]', vnode.ctor.name, vnode);
-    const { customHooks = emptyArr } = vnode.data;
-    customHooks.forEach((fn) =>
+    const { $$refId } = vnode.props;
+    const customHooks = hooksByRefId.get($$refId) || emptyArr;
+    customHooks.forEach(([fn]) =>
       fn('init', null, vnode));
+    // hooksByRefId.delete($$refId);
   },
   update(oldVnode, vnode) {
     /**
@@ -189,18 +192,25 @@ const builtinHooks = {
       //   '\n\n',
       //   vnode.ctor,
       // );
-      return;
+
+      // return;
     }
 
-    const { customHooks = emptyArr } = vnode.data;
-    customHooks.forEach((fn) =>
-      fn('update', oldVnode, vnode));
+    const { $$refId } = vnode.props;
+    const customHooks = hooksByRefId.get($$refId) || emptyArr;
+    const updateType = isComponentSwitch
+      ? '[update -> new_component]' : '[update]';
+    customHooks.forEach(([fn]) =>
+      fn(updateType, oldVnode, vnode));
+    // hooksByRefId.delete($$refId);
   },
   destroy(vnode) {
-    // console.log('[destroy]', oldVnode);
-    const { customHooks = emptyArr } = vnode.data;
-    customHooks.forEach((fn) =>
+    const { $$refId } = vnode.props;
+    const customHooks = hooksByRefId.get($$refId)
+      || emptyArr;
+    customHooks.forEach(([fn]) =>
       fn('destroy', vnode));
+    hooksByRefId.delete($$refId);
   },
 };
 
@@ -220,7 +230,7 @@ const createVnode = (tagName, config, customHooks) => {
     : childArray;
   const isComment = tagName === '!';
 
-  return {
+  const vnode = {
     sel: tagName,
     props,
     /**
@@ -245,10 +255,13 @@ const createVnode = (tagName, config, customHooks) => {
     type: valueTypes.vnode,
     ctor,
   };
+
+  return vnode;
 };
 
 export {
   createVnode, createTextVnode,
   ignoredValues, primitiveTypes,
   getDomNode, validateVnodeValue,
+  hooksByRefId,
 };

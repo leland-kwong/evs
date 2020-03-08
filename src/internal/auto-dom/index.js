@@ -15,12 +15,12 @@ import {
   primitiveTypes,
   ignoredValues,
   validateVnodeValue,
+  hooksByRefId,
 } from './vnode';
 import { string } from '../string';
 import { isArray, isFunc,
   isDef,
   stringifyValueForLogging,
-  setValue,
   identity } from '../utils';
 import { emptyArr } from '../../constants';
 import * as valueTypes from './value-types';
@@ -363,6 +363,18 @@ const CloneElement = ({ children: extendWith, $$refId }) => {
   return createVnode(sel, newConfig);
 };
 
+const useHook = (refId, callback, arg) => {
+  const curHooks = hooksByRefId.get(refId);
+
+  if (!curHooks) {
+    hooksByRefId.set(refId, []);
+    useHook(refId, callback, arg);
+    return;
+  }
+
+  curHooks.push([callback, arg]);
+};
+
 export {
   defineElement,
   nativeElements,
@@ -370,6 +382,7 @@ export {
   createElement,
   CloneElement,
   valueTypes,
+  useHook,
 };
 
 export { getDomNode } from './vnode';

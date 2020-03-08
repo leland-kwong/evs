@@ -1,11 +1,8 @@
 import { css } from 'emotion';
 import * as atomicState from 'atomic-state';
 import { nativeElements as A,
-  createElement,
-  CloneElement,
-  renderWith,
-  valueTypes } from '../src/internal/auto-dom';
-import { ignoredValues } from '../src/internal/auto-dom/vnode';
+  useHook,
+  renderWith } from '../src/internal/auto-dom';
 
 const { atom, swap, read } = atomicState;
 const cl = {
@@ -111,15 +108,15 @@ const transformItems = (items, sortBy) =>
 const modelsByRefId = new Map();
 
 const smartComponentHooks = {
-  onUpdate: (initialVnode, config) => {
+  onUpdate: (rootVnode, config) => {
     /**
      * @important
      * We need to transfer the key over to the newly
      * rendered vnode
      */
-    const { props: { $$refId, key } } = initialVnode;
+    const { props: { $$refId, key } } = rootVnode;
     const { render, model, modelRefKey, props } = config;
-    let oldVnode = initialVnode;
+    let oldVnode = rootVnode;
     const component = (
       [render, { props,
                  key,
@@ -137,7 +134,7 @@ const smartComponentHooks = {
     );
   },
 
-  onDestroy: (renderVnode, config) => {
+  onDestroy: (rootVnode, config) => {
     const { model, modelRefKey } = config;
 
     atomicState
@@ -156,47 +153,35 @@ const WithHooks = (config) => {
   };
   const { onUpdate,
           onDestroy } = smartComponentHooks;
-  const rootConfig = {
-    hookInit: (vnode) =>
-      onUpdate(vnode, renderConfig),
-    hookUpdate: (vnode) =>
-      onUpdate(vnode, renderConfig),
-    hookDestroy: (vnode) =>
-      onDestroy(vnode, renderConfig),
+  const hook = (type, oldVnode, vnode) => {
+    console.log('[hook]', type, oldVnode, vnode);
+
+    switch (type) {
+    case 'init':
+    case 'update':
+      return onUpdate(vnode, renderConfig);
+    case 'destroy':
+      return onDestroy(oldVnode, renderConfig);
+    default:
+      return null;
+    }
   };
-  const baseComponent = [render, renderConfig];
-  const renderValue = createElement(
-    [CloneElement,
-      baseComponent,
-      rootConfig],
-    $$refId,
-  );
 
   modelsByRefId.set(modelRefKey, modelRef);
 
   /*
-     * TODO:
-     * Since we're going to be using a hooks style
-     * module system, we need to move this logic
-     * over to the lisp processor. We also only need
-     * to do this when hooks are being used because
-     * there needs to be at least a comment/span node
-     * for snabbdom to trigger it.
-     */
+  * TODO:
+  * Since we're going to be using a hooks style
+  * module system, we need to move this logic
+  * over to the lisp processor. We also only need
+  * to do this when hooks are being used because
+  * there needs to be at least a comment/span node
+  * for snabbdom to trigger it.
+  */
 
-  // null, false, true, undefined
-  if (ignoredValues.has(renderValue)) {
-    return [A.comment, rootConfig];
-  }
+  useHook($$refId, hook);
 
-  // primitive values
-  const isVnode = valueTypes
-    .isType(renderValue, valueTypes.vnode);
-  if (!isVnode) {
-    return [A.span, rootConfig, renderValue];
-  }
-
-  return renderValue;
+  return [render, renderConfig];
 };
 
 const Title = (
@@ -232,11 +217,8 @@ const TodoItem = ({ key, value, onTodoChange }) => {
                 onInput: changeText }]);
 
   return (
-    [A.li, { class: itemStyle,
-             hookInit(vnode) {
-               //  console.log('[todoItem init]', vnode);
-             } },
-    completedField, ' ', textField]);
+    [A.li, { class: itemStyle },
+      completedField, ' ', textField]);
 };
 
 const TodoList = ({ items = [] }) =>
