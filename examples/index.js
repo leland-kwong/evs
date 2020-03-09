@@ -6,9 +6,11 @@ import {
   renderWith,
   nativeElements,
   createElement,
+  Fragment,
 } from './prototype.ldom';
 import * as styles from './styles';
 import { TodoApp } from './todo-app';
+import { useHook } from '../src/internal/auto-dom';
 
 function benchFn(
   fn, arg, numTests,
@@ -155,85 +157,65 @@ function benchFn(
           toggler, ' ', 'log action']]);
   };
 
-  let previousRender = rootDom;
+  let previousRender1 = rootDom;
+  let frag1State = [
+    'a',
+    'b',
+  ];
 
-  const render = (data) => {
-    const PerfTests = () => {
-      const runBench = () =>
-        evs.notify(
-          scope,
-          RunBench(data.benchOptions),
-        );
-
-      const setBenchOptions = (options) =>
-        evs.notify(
-          scope,
-          SetBenchOptions(options),
-        );
-
-      const btnRunBench = (
-        [A.button,
-          { onClick: runBench },
-          'create vnodes',
-        ]);
-
-      const BenchOptionCtrl = ({ fieldName, state }) =>
-        (
-          [A.label, { style: { display: 'block' } },
-            fieldName,
-            [A.input, { type: 'number',
-                        value: state[fieldName],
-                        onChange: (ev) => {
-                          setBenchOptions({
-                            [fieldName]: Math.max(1,
-                              Number(ev.currentTarget.value)),
-                          });
-                        } }]]);
-
-      const benchOptions = (
-        [A.div, { class: styles.Section },
-          [BenchOptionCtrl,
-            { fieldName: 'size', state: data.benchOptions }],
-          [BenchOptionCtrl,
-            { fieldName: 'numTests', state: data.benchOptions }]]
-      );
-
-      const measureIteration = scope.call(
-        RunMeasureIteration,
-      );
-      const btnMeasureIteration = (
-        [A.button,
-          { onClick: measureIteration },
-          'measure iteration',
-        ]);
-
+  const render = () => {
+    const Frag1 = (props) => {
+      console.log(props);
       return (
-        [A.div,
-          [A.h2, 'Perf testing'],
-          btnRunBench,
-          benchOptions,
-          btnMeasureIteration,
+        [Fragment, { key: 'fragA' },
+          [A.div, {
+            onClick() {
+              frag1State = [
+                Math.random(),
+                ...frag1State,
+              ];
+
+              // renderWith(
+              //   previousRender1,
+              //   {
+              //     ...previousRender1,
+              //   }
+              // )
+            },
+          }, frag1State[0]],
+          [A.div, 'b'],
         ]
       );
     };
 
-    const View = () =>
-      [A.div,
-        { style: {
-          fontFamily: 'sans-serif',
-        } },
-        [data.name.length % 2 === 0
-          ? [TodoApp]
-          : null],
-        [DevDashboard, data],
-        [PerfTests],
-        [Hello, { name: data.name,
-                  scope }],
-      ];
+    const Frag2 = () =>
+      ([Fragment,
+        [A.div, 'c'],
+        [A.div, 'd'],
+      ]);
 
-    previousRender = renderWith(
-      previousRender, [View], '@Example',
+    const RootView = () =>
+      (
+        [A.div,
+          [Frag1],
+          [Frag2]]
+      );
+
+    previousRender1 = renderWith(
+      previousRender1, [RootView], '@View1',
     );
+
+    console.log(previousRender1);
+
+    // const View2 = () =>
+    //   [
+    //     [A.h3, 'fragment 2'],
+    //     [Fragment2, { key: 'd' }],
+    //   ];
+
+    // previousRender1 = renderWith(
+    //   previousRender1, [View2], '@View2',
+    // );
   };
 
   const rootReducer = (state, action) => {

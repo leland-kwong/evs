@@ -215,7 +215,7 @@ const builtinHooks = {
 };
 
 const createVnode = (tagName, config, customHooks) => {
-  const { props } = config;
+  const { props = {} } = config;
   const {
     ctor,
   } = config;

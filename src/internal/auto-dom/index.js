@@ -312,6 +312,13 @@ const nativeElements = Object.keys(elementTypes)
 // the `!` symbol is a comment in snabbdom
 nativeElements.comment = defineElement('!');
 
+const fragmentComment = (props) => {
+  const comment = nativeElements.comment({ props });
+  comment.fragmentNode = true;
+  comment.text = props.isEnd ? ' /fragment ' : ' fragment ';
+  return comment;
+};
+
 /*
  * TODO:
  * Add support for rendering an array of vnodes
@@ -375,6 +382,13 @@ const useHook = (refId, callback, arg) => {
   curHooks.push([callback, arg]);
 };
 
+const Fragment = ({ children }) =>
+  [
+    [fragmentComment],
+    children,
+    [fragmentComment, { isEnd: true }],
+  ];
+
 export {
   defineElement,
   nativeElements,
@@ -383,6 +397,7 @@ export {
   CloneElement,
   valueTypes,
   useHook,
+  Fragment,
 };
 
 export { getDomNode } from './vnode';
