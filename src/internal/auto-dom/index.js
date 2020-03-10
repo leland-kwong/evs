@@ -15,7 +15,8 @@ import {
   primitiveTypes,
   ignoredValues,
   validateVnodeValue,
-  hooksByRefId,
+  enqueueHook,
+  setTreeValue,
 } from './vnode';
 import { string } from '../string';
 import { isArray, isFunc,
@@ -218,9 +219,10 @@ const processLisp = (value, path, prevKey, prevCtor) => {
          * still maintain their focus.
          */
         const nextPath = addToRefId(path, defaultKey);
-        return processLisp(
+        const result = processLisp(
           v, nextPath, defaultKey, prevCtor,
         );
+        return result;
       });
     }
 
@@ -246,12 +248,21 @@ const processLisp = (value, path, prevKey, prevCtor) => {
     value, argProcessor, path, prevKey, nextCtor,
   );
   const fInput = isDomComp ? config : config.props;
-  const nextValue = f(fInput);
-  const { props: { key = prevKey, $$refId } } = config;
 
+  /**
+   * @important
+   * this should be called before executing the
+   * dispatcher, so the code inside the dispatcher
+   * gets the right information.
+   */
   setCurrentProps(fInput);
   setCurrentDispatcher(f);
-  return processLisp(nextValue, $$refId, key, nextCtor);
+
+  const nextValue = f(fInput);
+  const { props: { key = prevKey, $$refId } } = config;
+  const nextNext = processLisp(nextValue, $$refId, key, nextCtor);
+  setTreeValue($$refId, nextNext);
+  return nextNext;
 };
 
 const validateSeedPath = (seedPath) => {
@@ -277,7 +288,8 @@ const createElement = (value, seedPath) => {
     validateSeedPath(seedPath);
   }
 
-  return processLisp(value, String(seedPath));
+  const vtree = processLisp(value, String(seedPath));
+  return vtree;
 };
 
 /**
@@ -371,18 +383,6 @@ const CloneElement = ({ children: extendWith, $$refId }) => {
   return createVnode(sel, newConfig);
 };
 
-const useHook = (refId, callback, arg) => {
-  const curHooks = hooksByRefId.get(refId);
-
-  if (!curHooks) {
-    hooksByRefId.set(refId, []);
-    useHook(refId, callback, arg);
-    return;
-  }
-
-  curHooks.push([callback, arg]);
-};
-
 export {
   defineElement,
   nativeElements,
@@ -390,7 +390,7 @@ export {
   createElement,
   CloneElement,
   valueTypes,
-  useHook,
+  enqueueHook as useHook,
 };
 
 export {

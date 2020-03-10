@@ -4,9 +4,17 @@ import { nativeElements as A,
   useHook,
   renderWith,
   getCurrentProps,
-  getCurrentDispatcher } from '../src/internal/auto-dom';
+  getCurrentDispatcher,
+  createElement,
+  valueTypes } from '../src/internal/auto-dom';
+import {
+  createVnode,
+  getTreeValue,
+  setTreeValue,
+} from '../src/internal/auto-dom/vnode';
+import { isArray } from '../src/internal/utils';
 
-const { atom, swap, read } = atomicState;
+const { atom, addWatch, swap, read } = atomicState;
 const cl = {
   list: css`
     margin: 0;
@@ -109,39 +117,6 @@ const transformItems = (items, sortBy) =>
 
 const modelsByRefId = new Map();
 
-const smartComponentHooks = {
-  onUpdate: (rootVnode, config) => {
-    /**
-     * @important
-     * We need to transfer the key over to the newly
-     * rendered vnode
-     */
-    const { render, model, refId, props } = config;
-    let oldVnode = rootVnode;
-    const component = (
-      [render, props]);
-    const renderComponent = () => {
-      oldVnode = renderWith(
-        oldVnode,
-        component,
-        refId,
-      );
-    };
-
-    atomicState.addWatch(
-      model, refId, renderComponent,
-    );
-  },
-
-  onDestroy: (rootVnode, config) => {
-    const { model, refId } = config;
-
-    atomicState
-      .removeWatch(model, refId);
-    modelsByRefId.delete(refId);
-  },
-};
-
 const Title = (
   [A.h1, 'Todo App']);
 
@@ -231,35 +206,86 @@ const SortOptions = ({ onSortChange, sortBy }) => {
 
 const useModel = (refId) => {
   const currentProps = getCurrentProps();
-  const render = getCurrentDispatcher();
-  console.log('[TodoMain | currentProps]', currentProps);
-  const { key: rootKey } = currentProps;
+  const dispatcher = getCurrentDispatcher();
+  // console.log('[TodoMain | currentProps]', currentProps);
   const model = modelsByRefId.get(refId) || todosModel();
-  const renderConfig = {
-    render,
-    props: currentProps,
-    model,
-    refId,
-    key: rootKey,
-  };
+  const reRender = () => {
+    const currentValue = getTreeValue(refId);
+    const isFragment = isArray(currentValue);
+    const nextRenderedValue = createElement(
+      [dispatcher, currentProps],
+      refId,
+    );
 
-  const { onUpdate,
-          onDestroy } = smartComponentHooks;
-  const hook = (type, oldVnode, vnode) => {
-    // console.log('[hook]', type, oldVnode, vnode);
+    if (!isFragment) {
+      setTreeValue(refId, nextRenderedValue);
+      renderWith(currentValue, nextRenderedValue);
+      return;
+    }
+
+    /**
+     * Rerender the fragment by rerendering the
+     * parent vnode and updating its children
+     * using the new fragment.
+     */
+    const pathArray = refId.split('.');
+    let i = pathArray.length;
+    let parentVnode;
+    // console.log('[patharray]', pathArray);
+
+    while (!parentVnode && i > 0) {
+      const path = pathArray.slice(0, i).join('.');
+      const value = getTreeValue(path);
+      if (valueTypes.isType(value, valueTypes.vnode)) {
+        parentVnode = value;
+        // console.log('[parent vnode]', path, value);
+      }
+      i -= 1;
+    }
+
+    const { children: oChildren } = parentVnode.props;
+    /**
+     * Update the old fragment with the new value
+     */
+    const newChildren = oChildren.map((ch) => {
+      const isCurrentFragment = ch === currentValue;
+      if (isCurrentFragment) {
+        return nextRenderedValue;
+      }
+      return ch;
+    });
+    /**
+     * Replace the old children with the new children
+     */
+    const nextParentVnode = createVnode(parentVnode.sel, {
+      ...parentVnode,
+      props: {
+        ...parentVnode.props,
+        children: newChildren,
+      },
+    });
+    setTreeValue(parentVnode.props.$$refId, nextParentVnode);
+    renderWith(parentVnode, nextParentVnode);
+  };
+  modelsByRefId.set(refId, model);
+  addWatch(model, 'reRender', reRender);
+
+  /**
+   * @TODO
+   * Add hook that removes watcher on destroy
+   */
+  useHook(refId, (type) => {
+    console.log('[hook]', type);
 
     switch (type) {
-    case 'init':
-    case 'update':
-      return onUpdate(vnode, renderConfig);
     case 'destroy':
-      return onDestroy(oldVnode, renderConfig);
+      modelsByRefId.delete(refId);
+      atomicState.removeWatch(model, 'reRender');
+      break;
     default:
-      return null;
+      break;
     }
-  };
-  useHook(refId, hook);
-  modelsByRefId.set(refId, model);
+  });
 
   return model;
 };
@@ -278,8 +304,10 @@ const TodoMain = (props) => {
   const onSortChange = (payload) =>
     swap(model, changeSorting, payload);
 
-  return (
+  return ([
+    // A.div,
     [A.div,
+      Math.random(),
       Title,
       [NewTodo, {
         onNewTodoCreate,
@@ -291,7 +319,9 @@ const TodoMain = (props) => {
         { items: transformItems(items, sortBy)
           .map(([key, value]) =>
             ({ key, value, onTodoChange })) }],
-    ]);
+    ],
+    [A.div, 'sibling: ', props.name],
+  ]);
 };
 
 export { TodoMain as TodoApp };

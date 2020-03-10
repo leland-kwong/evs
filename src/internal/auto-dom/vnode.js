@@ -10,8 +10,23 @@ import * as valueTypes from './value-types';
 
 const hookDebug = createDebug('vnode-hook');
 
-const hooksByRefId = new Map();
-const previousHooks = new Map();
+let hooksQueue = [];
+const enqueueHook = (refId, callback, arg) => {
+  hooksQueue.push([refId, callback, arg]);
+};
+const consumeHooksQueue = () => {
+  const hooks = hooksQueue;
+
+  hooksQueue = [];
+  return hooks;
+};
+
+const treeValues = new Map();
+const getTreeValue = (refId) =>
+  treeValues.get(refId);
+const setTreeValue = (refId, value) => {
+  treeValues.set(refId, value);
+};
 
 const { isType } = valueTypes;
 
@@ -164,19 +179,15 @@ const primitiveTypes = new Set([
 
 const builtinHooks = {
   init(vnode) {
-    const { $$refId } = vnode.props;
-    const customHooks = hooksByRefId.get($$refId) || emptyArr;
-    customHooks.forEach(([fn]) =>
-      fn('init', null, vnode));
-    previousHooks.set($$refId, customHooks);
-    hooksByRefId.delete($$refId);
+    const { customHooks = emptyArr } = vnode;
+    // const customHooks = hooksByRefId.get($$refId) || emptyArr;
+    customHooks.forEach(([refId, fn, arg]) =>
+      fn('init', refId, arg, vnode));
+    // previousHooks.set($$refId, customHooks);
+    // hooksByRefId.delete($$refId);
   },
   prepatch(oldVnode, vnode) {
-    hookDebug('[prepatch]');
-    const { $$refId } = vnode.props;
-    const customHooks = hooksByRefId.get($$refId) || emptyArr;
-    customHooks.forEach(([fn]) =>
-      fn('prepatch', oldVnode, vnode));
+    hookDebug('[prepatch]', oldVnode, vnode);
     // hooksByRefId.delete($$refId);
   },
   update(oldVnode, vnode) {
@@ -212,30 +223,18 @@ const builtinHooks = {
     const updateType = isComponentSwitch
       ? '[update -> new_component]' : '[update]';
     hookDebug(updateType, oldVnode, vnode);
-
-    const { $$refId } = vnode.props;
-    const customHooks = hooksByRefId.get($$refId) || emptyArr;
-    customHooks.forEach(([fn]) =>
-      fn(updateType, oldVnode, vnode));
+    const { customHooks = emptyArr } = vnode;
+    customHooks.forEach(([refId, fn, arg]) =>
+      fn(updateType, refId, arg, vnode));
   },
   postpatch(oldVnode, vnode) {
-    hookDebug('[postpatch]');
-    const { $$refId } = vnode.props;
-    const customHooks = hooksByRefId.get($$refId) || emptyArr;
-    customHooks.forEach(([fn]) =>
-      fn('[postpatch]', oldVnode, vnode));
-    previousHooks.set($$refId, customHooks);
-    hooksByRefId.delete($$refId);
+    hookDebug('[postpatch]', oldVnode, vnode);
   },
   destroy(vnode) {
-    hookDebug('[destroy]');
-    const { $$refId } = vnode.props;
-    const customHooks = previousHooks.get($$refId)
-      || emptyArr;
-    customHooks.forEach(([fn]) =>
-      fn('destroy', vnode));
-    previousHooks.delete($$refId);
-    hooksByRefId.delete($$refId);
+    hookDebug('[destroy]', vnode);
+    const { customHooks = emptyArr } = vnode;
+    customHooks.forEach(([refId, fn, arg]) =>
+      fn('destroy', refId, arg, vnode));
   },
 };
 
@@ -247,6 +246,7 @@ const createVnode = (tagName, config) => {
   const {
     children = emptyArr,
     $$refId,
+    text,
   } = props;
   const childArray = !isArray(children) ? [children] : children;
   const hasNestedCollections = childArray.find(isArray);
@@ -265,13 +265,14 @@ const createVnode = (tagName, config) => {
      * a more specific key that also enables keyed
      * fragment functionality.
      */
+    customHooks: consumeHooksQueue(),
     key: $$refId,
     data: {
       hook: builtinHooks,
       handleProp,
     },
     text: isComment
-      ? flattenedChildren.join('')
+      ? text
       : undefined,
     children: isComment
       ? emptyArr
@@ -279,7 +280,6 @@ const createVnode = (tagName, config) => {
     type: valueTypes.vnode,
     ctor,
   };
-
   return vnode;
 };
 
@@ -287,5 +287,5 @@ export {
   createVnode, createTextVnode,
   ignoredValues, primitiveTypes,
   getDomNode, validateVnodeValue,
-  hooksByRefId,
+  enqueueHook, getTreeValue, setTreeValue,
 };
