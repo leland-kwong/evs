@@ -77,7 +77,9 @@ const addToRefId = (currentPath, location) =>
 const prepareArgs = (
   lisp = emptyArr,
   callback,
-  path = [0],
+  path,
+  prevCtor,
+  onPathValue,
   skip = 0,
 ) => {
   const { length } = lisp;
@@ -90,7 +92,7 @@ const prepareArgs = (
     const argIndex = i + skip;
     const arg = lisp[argIndex];
     const refId = addToRefId(path, i);
-    const evaluated = callback(arg, refId, i);
+    const evaluated = callback(arg, refId, i, prevCtor, onPathValue);
 
     args[i] = evaluated;
     i += 1;
@@ -142,7 +144,10 @@ const getPropsFromArgs = (value) => {
  * @param {Function} argProcessor
  * @returns {Object} props object
  */
-const parseProps = (value = [], argProcessor, path, prevKey, ctor) => {
+const parseProps = (
+  value = [], argProcessor, path,
+  prevKey, ctor, onPathValue,
+) => {
   const props = getPropsFromArgs(value);
   const lastDotIndex = path.lastIndexOf('.');
   const { key = prevKey } = props;
@@ -160,7 +165,8 @@ const parseProps = (value = [], argProcessor, path, prevKey, ctor) => {
     : path;
   const skipValues = !props.empty ? 2 : 1;
   const args = prepareArgs(
-    value, argProcessor, refId, skipValues,
+    value, argProcessor, refId,
+    ctor, onPathValue, skipValues,
   );
   const baseConfig = {
     props: {
@@ -188,7 +194,10 @@ const getLispFunc = (lisp) =>
  * component call.
  * @returns {Any} evaluated value
  */
-const processLisp = (value, path, prevKey, prevCtor) => {
+const processLisp = (
+  value, path, prevKey,
+  prevCtor, onPathValue,
+) => {
   const $type = typeof value;
 
   if (primitiveTypes.has($type)) {
@@ -220,7 +229,8 @@ const processLisp = (value, path, prevKey, prevCtor) => {
          */
         const nextPath = addToRefId(path, defaultKey);
         const result = processLisp(
-          v, nextPath, defaultKey, prevCtor,
+          v, nextPath, defaultKey,
+          prevCtor, onPathValue,
         );
         return result;
       });
@@ -245,7 +255,8 @@ const processLisp = (value, path, prevKey, prevCtor) => {
     // only eagerly process vnode functions
     ? processLisp : identity;
   const config = parseProps(
-    value, argProcessor, path, prevKey, nextCtor,
+    value, argProcessor, path,
+    prevKey, nextCtor, onPathValue,
   );
   const fInput = isDomComp ? config : config.props;
 
@@ -260,15 +271,18 @@ const processLisp = (value, path, prevKey, prevCtor) => {
 
   const nextValue = f(fInput);
   const { props: { key = prevKey, $$refId } } = config;
-  const nextNext = processLisp(nextValue, $$refId, key, nextCtor);
-  setTreeValue($$refId, nextNext);
-  return nextNext;
+  const finalValue = processLisp(
+    nextValue, $$refId, key, nextCtor, onPathValue,
+  );
+
+  onPathValue($$refId, finalValue);
+  return finalValue;
 };
 
 const validateSeedPath = (seedPath) => {
   if (!vnodeKeyTypes[typeof seedPath]) {
     throw new Error(string([
-      '[createElement] `seedPath` must be one of ',
+      '[createElement] `seedPath` must be one of types: ',
       `[${Object.keys(vnodeKeyTypes)}]`,
     ]));
   }
@@ -279,16 +293,22 @@ const validateSeedPath = (seedPath) => {
  * @param {String | Number} seedPath id prefix
  * @returns vnode
  */
-const createElement = (value, seedPath) => {
-  if (isType(value, valueTypes.vnode)) {
-    return value;
-  }
-
+const createElement = (value, seedPath, onPathValue = identity) => {
   if (process.env.NODE_ENV === 'development') {
     validateSeedPath(seedPath);
   }
 
-  const vtree = processLisp(value, String(seedPath));
+  if (isType(value, valueTypes.vnode)) {
+    return value;
+  }
+
+  const vtree = processLisp(
+    value,
+    String(seedPath),
+    undefined,
+    undefined,
+    onPathValue,
+  );
   return vtree;
 };
 
@@ -341,8 +361,13 @@ const renderWith = (
   fromNode,
   component,
   seedPath,
+  onPathValue = (refId, nextVal) => {
+    setTreeValue(refId, nextVal);
+  },
 ) => {
-  const toNode = createElement(component, seedPath);
+  const toNode = createElement(
+    component, seedPath, onPathValue,
+  );
 
   return patch(fromNode, toNode);
 };

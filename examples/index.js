@@ -1,5 +1,6 @@
 /* global document, performance */
 import * as atomicState from 'atomic-state/lib';
+import { css } from 'emotion';
 import * as evs from '../src/index';
 import {
   Hello,
@@ -7,6 +8,7 @@ import {
   nativeElements,
   createElement,
 } from './prototype.ldom';
+import { getFullTree } from '../src/internal/auto-dom/vnode';
 import * as styles from './styles';
 import { TodoApp } from './todo-app';
 
@@ -70,12 +72,10 @@ function benchFn(
      * optimize or not.
      */
     const range = Array(size).fill(0);
-    const items = Array(10).fill(0);
     console.log(
       benchFn(() => {
-        range.forEach(() => {
-          items.map((v) =>
-            [v + 1, v + 2]);
+        range.forEach((i) => {
+          Symbol(1);
         });
       }, null, numTests),
     );
@@ -155,9 +155,7 @@ function benchFn(
           toggler, ' ', 'log action']]);
   };
 
-  let previousRender = rootDom;
-
-  const render = (data) => {
+  const View = ({ data }) => {
     const PerfTests = () => {
       const runBench = () =>
         evs.notify(
@@ -198,9 +196,11 @@ function benchFn(
             { fieldName: 'numTests', state: data.benchOptions }]]
       );
 
-      const measureIteration = scope.call(
-        RunMeasureIteration,
-      );
+      const measureIteration = () =>
+        evs.notify(
+          scope,
+          RunMeasureIteration(),
+        );
       const btnMeasureIteration = (
         [A.button,
           { onClick: measureIteration },
@@ -217,23 +217,53 @@ function benchFn(
       );
     };
 
-    const View = () =>
-      [A.div,
-        { style: {
-          fontFamily: 'sans-serif',
-        } },
-        [data.name.length % 2 === 0
-          ? [TodoApp]
-          : null],
-        [DevDashboard, data],
-        [PerfTests],
-        [Hello, { name: data.name,
-                  scope }],
-      ];
+    const mainStyle = (
+      [A.style,
+        /* css */`
+          body,
+          html {
+            margin: 0;
+            padding: 0;
+          }
 
-    previousRender = renderWith(
-      previousRender, [View], '@Example',
+          * {
+            box-sizing: border-box;
+          }
+        `,
+      ]
     );
+
+    return (
+      [A.div,
+        { class: css`
+            font-family: sans-serif;
+            min-height: 100vh;
+            padding: 1rem;
+          ` },
+        mainStyle,
+        data.name.length < 10
+          ? [TodoApp,
+            { key: '@TodoApp',
+              name: data.name },
+          ]
+          : [A.comment],
+
+        [TodoApp],
+        // [DevDashboard, data],
+        // [PerfTests],
+        [Hello, { name: data.name,
+                  scope,
+                  key: 'HelloRoot' }],
+      ]);
+  };
+
+  let previousRender = rootDom;
+
+  const render = (data) => {
+    previousRender = renderWith(
+      previousRender, [View, { data }], '@Example',
+    );
+    // console.log(getFullTree());
   };
 
   const rootReducer = (state, action) => {

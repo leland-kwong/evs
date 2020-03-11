@@ -10,9 +10,8 @@ import { nativeElements as A,
 import {
   createVnode,
   getTreeValue,
-  setTreeValue,
 } from '../src/internal/auto-dom/vnode';
-import { isArray } from '../src/internal/utils';
+import { isArray, identity } from '../src/internal/utils';
 
 const { atom, addWatch, swap, read } = atomicState;
 const cl = {
@@ -204,6 +203,23 @@ const SortOptions = ({ onSortChange, sortBy }) => {
       [SortBtn, { direction: 'desc' }]]);
 };
 
+const findParentVnode = (currentPath) => {
+  const pathArray = currentPath.split('.');
+  let i = pathArray.length;
+
+  while (i > 0) {
+    const path = pathArray.slice(0, i).join('.');
+    const value = getTreeValue(path);
+    if (valueTypes.isType(value, valueTypes.vnode)) {
+      return value;
+      // console.log('[parent vnode]', path, value);
+    }
+    i -= 1;
+  }
+
+  return 'noParentVnodeFound';
+};
+
 const useModel = (refId) => {
   const currentProps = getCurrentProps();
   const dispatcher = getCurrentDispatcher();
@@ -211,15 +227,24 @@ const useModel = (refId) => {
   const model = modelsByRefId.get(refId) || todosModel();
   const reRender = () => {
     const currentValue = getTreeValue(refId);
+    /**
+     * We know its a fragment if the returned value
+     * is a collection of vnodes
+     */
     const isFragment = isArray(currentValue);
-    const nextRenderedValue = createElement(
+    const nextValue = createElement(
       [dispatcher, currentProps],
       refId,
     );
 
     if (!isFragment) {
-      setTreeValue(refId, nextRenderedValue);
-      renderWith(currentValue, nextRenderedValue);
+      renderWith(currentValue, nextValue, refId, identity);
+      /**
+       * mutate original with tne new values since the
+       * source vtree will need the updates when we do
+       * a rerender of the full vtree.
+       */
+      Object.assign(currentValue, nextValue);
       return;
     }
 
@@ -228,52 +253,53 @@ const useModel = (refId) => {
      * parent vnode and updating its children
      * using the new fragment.
      */
-    const pathArray = refId.split('.');
-    let i = pathArray.length;
-    let parentVnode;
-    // console.log('[patharray]', pathArray);
-
-    while (!parentVnode && i > 0) {
-      const path = pathArray.slice(0, i).join('.');
-      const value = getTreeValue(path);
-      if (valueTypes.isType(value, valueTypes.vnode)) {
-        parentVnode = value;
-        // console.log('[parent vnode]', path, value);
-      }
-      i -= 1;
-    }
-
+    const parentVnode = findParentVnode(refId);
     const { children: oChildren } = parentVnode.props;
     /**
      * Update the old fragment with the new value
      */
     const newChildren = oChildren.map((ch) => {
-      const isCurrentFragment = ch === currentValue;
+      const isCurrentFragment = isArray(ch)
+        && ch[0].refId === currentValue[0].refId;
+
       if (isCurrentFragment) {
-        return nextRenderedValue;
+        return nextValue;
       }
+
       return ch;
     });
     /**
-     * Replace the old children with the new children
+     * Create the new parent vnode by copying it and
+     * updating the original children props with the
+     * new children props.
      */
-    const nextParentVnode = createVnode(parentVnode.sel, {
+    const nextParentVnode = createVnode({
       ...parentVnode,
       props: {
         ...parentVnode.props,
+        /**
+         * @important
+         * We must update the props in order to retain
+         * a proper historical copy of changes. Otherwise,
+         * if we modify the vnode's children directly, then
+         * the next render will not be accessing the latest
+         * children from the props. In other words, each
+         * update should have a new vnode where the props
+         * should be the representation of the change and
+         * `createVnode` will generate a new vnode based
+         * on the props.
+         */
         children: newChildren,
       },
     });
-    setTreeValue(parentVnode.props.$$refId, nextParentVnode);
-    renderWith(parentVnode, nextParentVnode);
+
+    const { $$refId: parentRefId } = parentVnode.props;
+    renderWith(parentVnode, nextParentVnode, parentRefId, identity);
+    Object.assign(parentVnode, nextParentVnode);
   };
   modelsByRefId.set(refId, model);
   addWatch(model, 'reRender', reRender);
 
-  /**
-   * @TODO
-   * Add hook that removes watcher on destroy
-   */
   useHook(refId, (type) => {
     console.log('[hook]', type);
 
@@ -289,6 +315,13 @@ const useModel = (refId) => {
 
   return model;
 };
+
+const FragmentNode = ({ children }) =>
+  (
+    [A.div, { class: 'Fragment' },
+      [A.small, children],
+    ]
+  );
 
 const TodoMain = (props) => {
   const { $$refId } = props;
@@ -306,8 +339,9 @@ const TodoMain = (props) => {
 
   return ([
     // A.div,
+    [FragmentNode, '<!--fragment start-->'],
+
     [A.div,
-      Math.random(),
       Title,
       [NewTodo, {
         onNewTodoCreate,
@@ -320,7 +354,9 @@ const TodoMain = (props) => {
           .map(([key, value]) =>
             ({ key, value, onTodoChange })) }],
     ],
-    [A.div, 'sibling: ', props.name],
+    [A.p, 'sibling: ', props.name],
+
+    [FragmentNode, '<!--fragment end-->'],
   ]);
 };
 

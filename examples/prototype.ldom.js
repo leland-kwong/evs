@@ -33,11 +33,16 @@ const Greeting = (props) => {
   );
 };
 
+const numbers = Array(10).fill(0).map((_, i) =>
+  i);
+
 const Hello = ({ name, scope }) =>
   ([A.div,
     [A.hr, { style: { height: '1px',
                       margin: '1rem 0',
                       background: '#000' } }],
+    [numbers.map((v) =>
+      [A.span, v])],
     [Greeting, { name, scope }],
   ]);
 
