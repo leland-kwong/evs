@@ -17,6 +17,7 @@ export const elementTypes = {
   ol: true,
   p: true,
   section: true,
+  small: true,
   span: true,
   strong: true,
   style: true,
