@@ -1,8 +1,7 @@
 import { css } from 'emotion';
 import * as atomicState from 'atomic-state';
 import { nativeElements as A } from '../src/internal/auto-dom/element';
-import { useModel } from '../src/internal/auto-dom';
-import { hasModel } from '../src/internal/auto-dom/hooks';
+import { useModel, hasModel } from '../src/internal/auto-dom';
 
 const { swap, read } = atomicState;
 const cl = {
@@ -204,9 +203,7 @@ const useAsync = (() =>
     const modelKey = 'useAsync';
     const isNew = !hasModel(refId, modelKey);
     const model = useModel(
-      refId,
-      modelKey,
-      noAsyncData,
+      refId, modelKey, noAsyncData,
     );
     const data = read(model);
 
@@ -224,7 +221,9 @@ const useAsync = (() =>
 
 const TodoMain = (props) => {
   const { $$refId } = props;
-  const model = useModel($$refId, 'todos', todosModel);
+  const model = useModel(
+    $$refId, 'todos', todosModel,
+  );
   const { items = {}, newTodo, sortBy } = read(model);
   const asyncData = useAsync($$refId, () =>
     new Promise((resolve) => {
