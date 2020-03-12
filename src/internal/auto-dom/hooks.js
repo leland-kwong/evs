@@ -2,14 +2,17 @@ import { addWatch, removeWatch } from 'atomic-state';
 import {
   createVnode,
   getTreeValue,
-} from '../src/internal/auto-dom/vnode';
-import { isArray, identity } from '../src/internal/utils';
-import { useHook,
-  renderWith,
+  enqueueHook as useHook,
+} from './vnode';
+import { isArray, identity } from '../utils';
+import * as valueTypes from './value-types';
+import { renderWith,
+  createElement } from './element';
+
+import {
   getCurrentProps,
   getCurrentDispatcher,
-  createElement,
-  valueTypes } from '../src/internal/auto-dom';
+} from './render-context';
 
 const modelsByRefId = new Map();
 
