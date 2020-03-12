@@ -7,6 +7,9 @@ module.exports = {
   moduleNameMapper: {},
   testMatch: ['**/*.test.(js|jsx)'],
   testPathIgnorePatterns: ['./node_modules/'],
+  transformIgnorePatterns: [
+    'node_modules/(?!(atomic-state)/)',
+  ],
   globals: {
     window: {},
     document: {

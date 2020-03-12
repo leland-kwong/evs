@@ -8,7 +8,6 @@ import { isArray, identity } from '../utils';
 import * as valueTypes from './value-types';
 import { renderWith,
   createElement } from './element';
-
 import {
   getCurrentProps,
   getCurrentDispatcher,
@@ -119,15 +118,20 @@ const forceUpdate = (refId, dispatcher, currentProps) => {
   Object.assign(parentVnode, nextParentVnode);
 };
 
-const useModel = (refId, initModel) => {
+const useUpdate = (refId) => {
   const currentProps = getCurrentProps();
   const dispatcher = getCurrentDispatcher();
+
+  return () => {
+    forceUpdate(refId, dispatcher, currentProps);
+  };
+};
+
+const useModel = (refId, initModel) => {
   const model = modelsByRefId.get(refId) || initModel();
 
   modelsByRefId.set(refId, model);
-  addWatch(model, 'reRender', () => {
-    forceUpdate(refId, dispatcher, currentProps);
-  });
+  addWatch(model, 'reRender', useUpdate(refId));
   useHook(refId, cleanupOnDestroy);
 
   return model;
