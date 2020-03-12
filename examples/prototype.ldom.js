@@ -36,13 +36,18 @@ const Greeting = (props) => {
 const numbers = Array(10).fill(0).map((_, i) =>
   i);
 
+const Divider = (
+  [A.hr, { style: { height: '1px',
+                    margin: '1rem 0',
+                    background: '#000' } }]
+);
+
 const Hello = ({ name, scope }) =>
   ([A.div,
-    [A.hr, { style: { height: '1px',
-                      margin: '1rem 0',
-                      background: '#000' } }],
+    Divider,
     [numbers.map((v) =>
       [A.span, v])],
+    Divider,
     [Greeting, { name, scope }],
   ]);
 

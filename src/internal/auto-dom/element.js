@@ -24,8 +24,6 @@ import { isArray, isFunc,
   identity } from '../utils';
 import {
   emptyArr,
-  noCurrentProps,
-  noCurrentDispatcher,
 } from '../../constants';
 import * as valueTypes from './value-types';
 import {
@@ -262,6 +260,7 @@ const processLisp = (
     prevKey, nextCtor, onPathValue,
   );
   const fInput = isDomComp ? config : config.props;
+  const { props: { key = prevKey, $$refId } } = config;
 
   /**
    * @important
@@ -269,11 +268,10 @@ const processLisp = (
    * dispatcher, so the code inside the dispatcher
    * gets the right information.
    */
-  setCurrentProps(fInput);
-  setCurrentDispatcher(f);
+  setCurrentProps($$refId, fInput);
+  setCurrentDispatcher($$refId, f);
 
   const nextValue = f(fInput);
-  const { props: { key = prevKey, $$refId } } = config;
   const finalValue = processLisp(
     nextValue, $$refId, key, nextCtor, onPathValue,
   );
@@ -371,9 +369,6 @@ const renderWith = (
   const toNode = createElement(
     component, seedPath, onPathValue,
   );
-
-  setCurrentProps(noCurrentProps);
-  setCurrentDispatcher(noCurrentDispatcher);
 
   return patch(fromNode, toNode);
 };

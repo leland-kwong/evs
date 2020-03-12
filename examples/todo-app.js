@@ -2,8 +2,9 @@ import { css } from 'emotion';
 import * as atomicState from 'atomic-state';
 import { nativeElements as A } from '../src/internal/auto-dom/element';
 import { useModel } from '../src/internal/auto-dom';
+import { hasModel } from '../src/internal/auto-dom/hooks';
 
-const { atom, swap, read } = atomicState;
+const { swap, read } = atomicState;
 const cl = {
   list: css`
     margin: 0;
@@ -38,7 +39,7 @@ const initialModel = {
 };
 
 const todosModel = () =>
-  atom(initialModel);
+  initialModel;
 
 const updateTodo = (state, { key, changes }) => {
   const { items } = state;
@@ -196,10 +197,39 @@ const SortOptions = ({ onSortChange, sortBy }) => {
 const FragmentNode = ({ children }) =>
   ([A.comment, { text: children }]);
 
+const noAsyncData = 'noAsyncData';
+
+const useAsync = (() =>
+  (refId, fetchData, arg) => {
+    const modelKey = 'useAsync';
+    const isNew = !hasModel(refId, modelKey);
+    const model = useModel(
+      refId,
+      modelKey,
+      noAsyncData,
+    );
+    const data = read(model);
+
+    if (isNew) {
+      console.log('[new fetch]', modelKey);
+      const asyncValue = fetchData(arg);
+      asyncValue.then((v) => {
+        swap(model, () =>
+          v);
+      });
+    }
+
+    return data;
+  })();
+
 const TodoMain = (props) => {
   const { $$refId } = props;
-  const model = useModel($$refId, todosModel);
+  const model = useModel($$refId, 'todos', todosModel);
   const { items = {}, newTodo, sortBy } = read(model);
+  const asyncData = useAsync($$refId, () =>
+    new Promise((resolve) => {
+      setTimeout(resolve, 1000, Math.random());
+    }));
 
   const onTodoChange = (payload) =>
     swap(model, updateTodo, payload);
@@ -212,6 +242,8 @@ const TodoMain = (props) => {
 
   return ([
     // A.div,
+    [A.div,
+      'async data: ', [A.strong, asyncData]],
     [FragmentNode, 'fragment'],
 
     [A.div,

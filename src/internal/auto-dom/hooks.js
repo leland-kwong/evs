@@ -1,4 +1,4 @@
-import { addWatch, removeWatch } from 'atomic-state';
+import { addWatch, removeWatch, atom } from 'atomic-state';
 import {
   createVnode,
   getTreeValue,
@@ -7,7 +7,7 @@ import {
 import {
   noCurrentDispatcher,
 } from '../../constants';
-import { isArray, identity } from '../utils';
+import { isArray, identity, isFunc } from '../utils';
 import * as valueTypes from './value-types';
 import { renderWith,
   createElement } from './element';
@@ -16,7 +16,7 @@ import {
   getCurrentDispatcher,
 } from './render-context';
 
-const modelsByRefId = new Map();
+const activeModels = new Map();
 
 const findParentVnode = (currentPath) => {
   const pathArray = currentPath.split('.');
@@ -37,13 +37,15 @@ const findParentVnode = (currentPath) => {
   return 'noParentVnodeFound';
 };
 
-const cleanupOnDestroy = (type, refId) => {
-  // console.log('[hook]', type);
-  const model = modelsByRefId.get(refId);
+const cleanupOnDestroy = (
+  type, refId, modelKey,
+) => {
+  // console.log('[hook]', type, refId, modelKey);
+  const model = activeModels.get(modelKey);
 
   switch (type) {
   case 'destroy':
-    modelsByRefId.delete(refId);
+    activeModels.delete(modelKey);
     removeWatch(model, 'reRender');
     break;
   default:
@@ -135,8 +137,8 @@ const forceUpdate = (
 };
 
 const useUpdate = (refId) => {
-  const currentProps = getCurrentProps();
-  const dispatcher = getCurrentDispatcher();
+  const currentProps = getCurrentProps(refId);
+  const dispatcher = getCurrentDispatcher(refId);
 
   if (dispatcher === noCurrentDispatcher) {
     throw new Error(
@@ -149,19 +151,42 @@ const useUpdate = (refId) => {
   };
 };
 
-const useModel = (refId, initModel) => {
-  const model = modelsByRefId.get(refId)
-    || initModel();
+const getScopedKey = (refId, key) =>
+  `${refId}--${key}`;
+
+const initModel = (initialModel) =>
+  atom(
+    isFunc(initialModel)
+      ? initialModel()
+      : initialModel,
+  );
+
+const useModel = (
+  refId,
+  modelKey = '@model',
+  initialModel,
+) => {
+  const scopedKey = getScopedKey(refId, modelKey);
+  const model = activeModels.get(scopedKey)
+    || initModel(initialModel);
   const update = useUpdate(refId);
 
-  modelsByRefId.set(refId, model);
+  activeModels.set(scopedKey, model);
   addWatch(model, 'reRender', update);
-  useHook(refId, cleanupOnDestroy);
+  useHook(refId, cleanupOnDestroy, scopedKey);
+
+  console.log(activeModels);
 
   return model;
 };
 
+const hasModel = (refId, modelKey) =>
+  activeModels.has(
+    getScopedKey(refId, modelKey),
+  );
+
 export {
   useModel,
+  hasModel,
   useUpdate,
 };
