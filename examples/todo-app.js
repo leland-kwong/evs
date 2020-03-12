@@ -1,7 +1,7 @@
 import { css } from 'emotion';
 import * as atomicState from 'atomic-state';
-import { nativeElements as A } from '../src/internal/auto-dom';
-import { useModel } from './use-model';
+import { nativeElements as A } from '../src/internal/auto-dom/element';
+import { useModel } from '../src/internal/auto-dom';
 
 const { atom, swap, read } = atomicState;
 const cl = {

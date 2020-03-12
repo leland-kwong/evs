@@ -1,7 +1,7 @@
 /* global */
 
 import * as evs from '../src';
-import { nativeElements as A } from '../src/internal/auto-dom';
+import { nativeElements as A } from '../src/internal/auto-dom/element';
 
 function SetName(name) {
   return {
@@ -50,4 +50,4 @@ export {
   Hello,
 };
 
-export * from '../src/internal/auto-dom';
+export * from '../src/internal/auto-dom/element';
