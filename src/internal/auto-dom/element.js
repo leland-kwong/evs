@@ -22,7 +22,11 @@ import { isArray, isFunc,
   isDef,
   stringifyValueForLogging,
   identity } from '../utils';
-import { emptyArr } from '../../constants';
+import {
+  emptyArr,
+  noCurrentProps,
+  noCurrentDispatcher,
+} from '../../constants';
 import * as valueTypes from './value-types';
 import {
   setCurrentProps,
@@ -367,6 +371,9 @@ const renderWith = (
   const toNode = createElement(
     component, seedPath, onPathValue,
   );
+
+  setCurrentProps(noCurrentProps);
+  setCurrentDispatcher(noCurrentDispatcher);
 
   return patch(fromNode, toNode);
 };

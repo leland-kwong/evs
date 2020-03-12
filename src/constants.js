@@ -16,3 +16,11 @@ export const domNodeTypes = {
 export const emptyObj = Object.freeze({});
 
 export const emptyArr = Object.freeze([]);
+
+export const noCurrentProps = Symbol(
+  '@noCurrentProps',
+);
+
+export const noCurrentDispatcher = Symbol(
+  '@noCurrentDispatcher',
+);

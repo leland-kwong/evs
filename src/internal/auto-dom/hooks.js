@@ -4,6 +4,9 @@ import {
   getTreeValue,
   enqueueHook as useHook,
 } from './vnode';
+import {
+  noCurrentDispatcher,
+} from '../../constants';
 import { isArray, identity } from '../utils';
 import * as valueTypes from './value-types';
 import { renderWith,
@@ -22,7 +25,10 @@ const findParentVnode = (currentPath) => {
   while (i > 0) {
     const path = pathArray.slice(0, i).join('.');
     const value = getTreeValue(path);
-    if (valueTypes.isType(value, valueTypes.vnode)) {
+    if (valueTypes.isType(
+      value,
+      valueTypes.vnode,
+    )) {
       return value;
     }
     i -= 1;
@@ -45,7 +51,9 @@ const cleanupOnDestroy = (type, refId) => {
   }
 };
 
-const forceUpdate = (refId, dispatcher, currentProps) => {
+const forceUpdate = (
+  refId, dispatcher, currentProps,
+) => {
   const currentValue = getTreeValue(refId);
   /**
    * We know its a fragment if the returned value
@@ -58,7 +66,10 @@ const forceUpdate = (refId, dispatcher, currentProps) => {
   );
 
   if (!isFragment) {
-    renderWith(currentValue, nextValue, refId, identity);
+    renderWith(
+      currentValue, nextValue,
+      refId, identity,
+    );
     /**
      * mutate original with tne new values since the
      * source vtree will need the updates when we do
@@ -113,8 +124,13 @@ const forceUpdate = (refId, dispatcher, currentProps) => {
     },
   });
 
-  const { $$refId: parentRefId } = parentVnode.props;
-  renderWith(parentVnode, nextParentVnode, parentRefId, identity);
+  const {
+    $$refId: parentRefId,
+  } = parentVnode.props;
+  renderWith(
+    parentVnode, nextParentVnode,
+    parentRefId, identity,
+  );
   Object.assign(parentVnode, nextParentVnode);
 };
 
@@ -122,16 +138,24 @@ const useUpdate = (refId) => {
   const currentProps = getCurrentProps();
   const dispatcher = getCurrentDispatcher();
 
+  if (dispatcher === noCurrentDispatcher) {
+    throw new Error(
+      '[useUpdate] must be called during the render phase',
+    );
+  }
+
   return () => {
     forceUpdate(refId, dispatcher, currentProps);
   };
 };
 
 const useModel = (refId, initModel) => {
-  const model = modelsByRefId.get(refId) || initModel();
+  const model = modelsByRefId.get(refId)
+    || initModel();
+  const update = useUpdate(refId);
 
   modelsByRefId.set(refId, model);
-  addWatch(model, 'reRender', useUpdate(refId));
+  addWatch(model, 'reRender', update);
   useHook(refId, cleanupOnDestroy);
 
   return model;
@@ -139,5 +163,5 @@ const useModel = (refId, initModel) => {
 
 export {
   useModel,
-  forceUpdate,
+  useUpdate,
 };
