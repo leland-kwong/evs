@@ -1,5 +1,5 @@
 /* global document, performance */
-import * as atomicState from 'atomic-state/lib';
+import * as atomicState from 'atomic-state';
 import { css } from 'emotion';
 import * as evs from '../src/index';
 import {
@@ -10,6 +10,7 @@ import {
 } from './prototype.ldom';
 import * as styles from './styles';
 import { TodoApp } from './todo-app';
+import { useModel } from '../src/internal/auto-dom';
 
 function benchFn(
   fn, arg, numTests,
@@ -36,7 +37,7 @@ function benchFn(
   document.body.appendChild(rootDom);
 
   const A = nativeElements;
-  const { atom, swap } = atomicState;
+  const { swap } = atomicState;
 
   const scope = evs.createScope('@vdomTest');
 
@@ -85,88 +86,52 @@ function benchFn(
     MeasureIteration,
   };
 
-  const onEvent = (action, context) => {
-    const { render, model, rootReducer } = context;
-    const nextState = swap(
-      model, rootReducer, action,
-    );
-    if (nextState.logAction) {
-      console.log(`[${scope.namespace}]`, action, nextState);
-    }
-    render(nextState);
-
-    const { type } = action;
-    if (effects[type]) {
-      effects[type](action);
-    }
-  };
-
-  const RunBench = (options) =>
-    ({
-      type: 'BenchCreateElement',
-      ...options,
-    });
-
-  const SetBenchOptions = (options) =>
-    ({
-      type: 'SetBenchOptions',
-      options,
-    });
-
-  const RunMeasureIteration = () =>
-    ({
-      type: 'MeasureIteration',
-    });
-
-  const ToggleLogger = (enabled) =>
-    ({
-      type: 'ToggleLogAction',
-      enabled,
-    });
-
-  const model = atom({
+  const defaultState = {
     name: 'Leland',
     logAction: false,
     benchOptions: {
       size: 200,
       numTests: 3,
     },
-  });
-
-  const DevDashboard = ({ logAction = false }) => {
-    const toggler = (
-      [A.input,
-        { type: 'checkbox',
-          class: 'dev-checkbox',
-          checked: logAction,
-          onChange: (event) =>
-            evs.notify(
-              scope,
-              ToggleLogger(
-                evs.InputChecked(event),
-              ),
-            ) }]
-    );
-
-    return (
-      [A.form,
-        [A.label,
-          toggler, ' ', 'log action']]);
   };
 
-  const View = ({ data }) => {
-    const PerfTests = () => {
-      const runBench = () =>
-        evs.notify(
-          scope,
-          RunBench(data.benchOptions),
-        );
+  const rootReducer = (state, action) => {
+    const { type } = action;
 
-      const setBenchOptions = (options) =>
-        evs.notify(
-          scope,
-          SetBenchOptions(options),
-        );
+    switch (type) {
+    case 'ToggleLogAction': {
+      const { enabled } = action;
+      return { ...state, logAction: enabled };
+    }
+
+    case 'SetName': {
+      const { name } = action;
+      return { ...state, name };
+    }
+
+    case 'SetBenchOptions': {
+      const { options } = action;
+      return { ...state,
+               benchOptions: { ...state.benchOptions,
+                               ...options } };
+    }
+
+    case '@VdomTestInit':
+      return state;
+
+    default:
+      return state;
+    }
+  };
+
+  const View = ({ $$refId }) => {
+    const model = useModel($$refId, $$refId, defaultState);
+    const data = atomicState.read(model);
+
+    const PerfTests = () => {
+      const runBench = () => {
+        effects.BenchCreateElement(data.benchOptions);
+      };
 
       const btnRunBench = (
         [A.button,
@@ -181,9 +146,12 @@ function benchFn(
             [A.input, { type: 'number',
                         value: state[fieldName],
                         onChange: (ev) => {
-                          setBenchOptions({
-                            [fieldName]: Math.max(1,
-                              Number(ev.currentTarget.value)),
+                          swap(model, rootReducer, {
+                            type: 'SetBenchOptions',
+                            options: {
+                              [fieldName]: Math.max(1,
+                                Number(ev.currentTarget.value)),
+                            },
                           });
                         } }]]);
 
@@ -195,23 +163,11 @@ function benchFn(
             { fieldName: 'numTests', state: data.benchOptions }]]
       );
 
-      const measureIteration = () =>
-        evs.notify(
-          scope,
-          RunMeasureIteration(),
-        );
-      const btnMeasureIteration = (
-        [A.button,
-          { onClick: measureIteration },
-          'measure iteration',
-        ]);
-
       return (
         [A.div,
           [A.h2, 'Perf testing'],
           btnRunBench,
           benchOptions,
-          btnMeasureIteration,
         ]
       );
     };
@@ -248,56 +204,17 @@ function benchFn(
           : [A.comment],
 
         [TodoApp],
-        // [DevDashboard, data],
-        // [PerfTests],
+        [PerfTests],
         [Hello, { name: data.name,
-                  scope,
+                  onNameChange(newName) {
+                    swap(model, rootReducer, {
+                      type: 'SetName',
+                      name: newName,
+                    });
+                  },
                   key: 'HelloRoot' }],
       ]);
   };
 
-  let previousRender = rootDom;
-
-  const render = (data) => {
-    previousRender = renderWith(
-      previousRender, [View, { data }], '@Example',
-    );
-    // console.log(getFullTree());
-  };
-
-  const rootReducer = (state, action) => {
-    const { type } = action;
-
-    switch (type) {
-    case 'ToggleLogAction': {
-      const { enabled } = action;
-      return { ...state, logAction: enabled };
-    }
-
-    case 'SetName': {
-      const { name } = action;
-      return { ...state, name };
-    }
-
-    case 'SetBenchOptions': {
-      const { options } = action;
-      return { ...state,
-               benchOptions: { ...state.benchOptions,
-                               ...options } };
-    }
-
-    case '@VdomTestInit':
-      return state;
-
-    default:
-      return state;
-    }
-  };
-
-  evs.subscribe(scope, onEvent,
-    { render, rootReducer, model });
-
-  evs.notify(scope, {
-    type: '@VdomTestInit',
-  });
+  renderWith(rootDom, [View], '@Example');
 })();
