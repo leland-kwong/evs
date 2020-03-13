@@ -25,7 +25,7 @@ import { isArray, isFunc,
 import {
   emptyArr,
   pathSeparator,
-} from '../../constants';
+} from '../constants';
 import * as valueTypes from './value-types';
 import {
   setCurrentProps,

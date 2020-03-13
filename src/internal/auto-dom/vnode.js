@@ -5,7 +5,7 @@ import { invalidComponentMsg } from './invalid-component-msg';
 import { string } from '../string';
 import { isArray, isFunc,
   setValue, stringifyValueForLogging, isDef } from '../utils';
-import { emptyArr } from '../../constants';
+import { emptyArr } from '../constants';
 import * as valueTypes from './value-types';
 
 const hookDebug = createDebug('vnode-hook');

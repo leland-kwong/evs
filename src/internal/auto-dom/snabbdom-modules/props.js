@@ -7,9 +7,8 @@ Object.defineProperty(exports, '__esModule', { value: true });
  * property name to set does not exist on the dom node.
  */
 
-const { domNodeTypes } = require('../../../constants');
+const { domNodeTypes, emptyObj } = require('../../constants');
 const hookType = require('./hook-type');
-const { emptyObj } = require('../../../constants');
 
 const hasOwn = Object.prototype.hasOwnProperty;
 

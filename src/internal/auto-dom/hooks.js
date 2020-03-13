@@ -7,7 +7,7 @@ import {
 import {
   noCurrentDispatcher,
   pathSeparator,
-} from '../../constants';
+} from '../constants';
 import {
   isArray, identity, isFunc, withDefault,
 } from '../utils';

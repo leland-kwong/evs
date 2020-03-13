@@ -1,6 +1,6 @@
 /* global document */
 import { getSupportedEventTypes } from '../get-event-types';
-import { nsDelim, isBrowser } from '../constants';
+import { nsDelim, isBrowser } from './constants';
 import { uid } from './uid';
 import {
   encodeAction,

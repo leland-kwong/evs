@@ -1,7 +1,7 @@
 import {
   noCurrentProps,
   noCurrentDispatcher,
-} from '../../constants';
+} from '../constants';
 
 /**
  * A set of apis for introspection on the

@@ -3,7 +3,7 @@ import {
   nsDelim,
   isBrowser,
   domNodeTypes as nodeTypes,
-} from './constants';
+} from './internal/constants';
 import { equal } from './internal/equal';
 import { string } from './internal/string';
 import { isFunc } from './internal/utils';

@@ -1,7 +1,7 @@
 /* global window */
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable guard-for-in */
-import { isBrowser } from '../constants';
+import { isBrowser } from './constants';
 import { string } from './string';
 import { isFunc } from './utils';
 
