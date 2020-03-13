@@ -295,7 +295,7 @@ const createVnode = (tagNameOrVnode, config) => {
      *  [A.div, { key: 'foobar' } 'some text']
      * ])
      * const View = () => ([
-     *  // these fragments are unique
+     *  // the key for each div is scoped to the fragment
      *  [Fragment],
      *  [Fragment],
      * ])
