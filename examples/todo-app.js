@@ -1,7 +1,7 @@
 import { css } from 'emotion';
 import * as atomicState from 'atomic-state';
 import { nativeElements as A } from '../src/internal/auto-dom/element';
-import { useModel, hasModel, getAllModels } from '../src/internal/auto-dom';
+import { useModel, hasModel } from '../src/internal/auto-dom';
 
 const { swap, read } = atomicState;
 const cl = {
@@ -237,10 +237,6 @@ const TodoMain = (props) => {
     }), {
     apiRoute: 'randomNum',
   });
-
-  console.log(
-    getAllModels($$refId),
-  );
 
   const onTodoChange = (payload) =>
     swap(model, updateTodo, payload);
