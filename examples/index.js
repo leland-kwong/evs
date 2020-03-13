@@ -1,7 +1,6 @@
 /* global document, performance */
 import * as atomicState from 'atomic-state';
 import { css } from 'emotion';
-import * as evs from '../src/index';
 import {
   Hello,
   renderWith,
@@ -39,23 +38,22 @@ function benchFn(
   const A = nativeElements;
   const { swap } = atomicState;
 
-  const scope = evs.createScope('@vdomTest');
-
   const BenchCreateElement = ({ size = 1000, numTests = 5 }) => {
     const seedPath = Math.random().toString(32);
     const range = Array(size).fill(0);
+    const onNameChange = () => {};
     const test = () => {
       range.forEach(() => {
         createElement(
           [Hello, { name: 'foo',
-                    scope }],
+                    onNameChange }],
           seedPath,
         );
       });
     };
 
     const vNode = createElement(
-      [Hello, { name: 'foo', scope }],
+      [Hello, { name: 'foo', onNameChange }],
       seedPath,
     );
     console.log(vNode);
@@ -74,7 +72,7 @@ function benchFn(
     const range = Array(size).fill(0);
     console.log(
       benchFn(() => {
-        range.forEach((i) => {
+        range.forEach(() => {
           Symbol(1);
         });
       }, null, numTests),
