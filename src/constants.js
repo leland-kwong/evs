@@ -1,3 +1,5 @@
+export const pathSeparator = '.';
+
 export const nsDelim = '::';
 
 // matches {mySelector}

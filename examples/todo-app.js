@@ -1,7 +1,7 @@
 import { css } from 'emotion';
 import * as atomicState from 'atomic-state';
 import { nativeElements as A } from '../src/internal/auto-dom/element';
-import { useModel, hasModel } from '../src/internal/auto-dom';
+import { useModel, hasModel, getAllModels } from '../src/internal/auto-dom';
 
 const { swap, read } = atomicState;
 const cl = {
@@ -198,18 +198,23 @@ const FragmentNode = ({ children }) =>
 
 const noAsyncData = 'noAsyncData';
 
-const useAsync = (() =>
-  (refId, fetchData, arg) => {
-    const modelKey = 'useAsync';
-    const isNew = !hasModel(refId, modelKey);
+const useAsync = (() => {
+  const modelMeta = {
+    shouldDestroy: () =>
+      false,
+  };
+
+  return (refId, fetchData, fetchOptions) => {
+    const { apiRoute = '' } = fetchOptions;
+    const isNew = !hasModel(refId, apiRoute);
     const model = useModel(
-      refId, modelKey, noAsyncData,
+      refId, apiRoute, noAsyncData, modelMeta,
     );
     const data = read(model);
 
     if (isNew) {
-      console.log('[new fetch]', modelKey);
-      const asyncValue = fetchData(arg);
+      console.log('[new fetch]', apiRoute);
+      const asyncValue = fetchData(fetchOptions);
       asyncValue.then((v) => {
         swap(model, () =>
           v);
@@ -217,18 +222,25 @@ const useAsync = (() =>
     }
 
     return data;
-  })();
+  };
+})();
 
 const TodoMain = (props) => {
   const { $$refId } = props;
   const model = useModel(
-    $$refId, 'todos', todosModel,
+    $$refId, `${$$refId}--todos`, todosModel,
   );
   const { items = {}, newTodo, sortBy } = read(model);
   const asyncData = useAsync($$refId, () =>
     new Promise((resolve) => {
       setTimeout(resolve, 1000, Math.random());
-    }));
+    }), {
+    apiRoute: 'randomNum',
+  });
+
+  console.log(
+    getAllModels($$refId),
+  );
 
   const onTodoChange = (payload) =>
     swap(model, updateTodo, payload);

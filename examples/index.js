@@ -8,7 +8,6 @@ import {
   nativeElements,
   createElement,
 } from './prototype.ldom';
-import { getFullTree } from '../src/internal/auto-dom/vnode';
 import * as styles from './styles';
 import { TodoApp } from './todo-app';
 
@@ -243,7 +242,7 @@ function benchFn(
         mainStyle,
         data.name.length < 10
           ? [TodoApp,
-            { key: '@TodoApp',
+            { key: 'TodoApp',
               name: data.name },
           ]
           : [A.comment],

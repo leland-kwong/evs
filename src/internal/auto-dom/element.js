@@ -24,6 +24,7 @@ import { isArray, isFunc,
   identity } from '../utils';
 import {
   emptyArr,
+  pathSeparator,
 } from '../../constants';
 import * as valueTypes from './value-types';
 import {
@@ -38,7 +39,7 @@ const vnodeKeyTypes = {
   number: true,
 };
 
-const keyRegex = /^[a-zA-Z0-9-_@]*$/;
+const keyRegex = /^[a-zA-Z0-9-_@/]*$/;
 
 const validateKey = (key) => {
   if (process.env.NODE_ENV !== 'development') {
@@ -67,7 +68,7 @@ const patch = snabbdomInit([
 ]);
 
 const addToRefId = (currentPath, location) =>
-  `${currentPath}.${location}`;
+  `${currentPath}${pathSeparator}${location}`;
 
 /**
  * Makes a new list of arguments. This also

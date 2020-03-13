@@ -6,24 +6,48 @@ import {
 } from './vnode';
 import {
   noCurrentDispatcher,
+  pathSeparator,
 } from '../../constants';
-import { isArray, identity, isFunc } from '../utils';
+import {
+  isArray, identity, isFunc, withDefault,
+} from '../utils';
 import * as valueTypes from './value-types';
-import { renderWith,
-  createElement } from './element';
+import {
+  renderWith,
+  createElement,
+} from './element';
 import {
   getCurrentProps,
   getCurrentDispatcher,
 } from './render-context';
 
+const getPathRoot = (path) => {
+  const sepIndex = path.indexOf(pathSeparator);
+
+  return sepIndex === -1
+    ? path : path.slice(0, sepIndex);
+};
+
 const activeModels = new Map();
 
-const findParentVnode = (currentPath) => {
-  const pathArray = currentPath.split('.');
-  let i = pathArray.length;
+const getScopedModels = (path) =>
+  activeModels.get(
+    getPathRoot(path),
+  );
 
-  while (i > 0) {
-    const path = pathArray.slice(0, i).join('.');
+const setupScopedModels = (path) =>
+  activeModels.set(
+    getPathRoot(path), new Map(),
+  );
+
+const findParentVnode = (currentPath) => {
+  const pathArray = currentPath.split(pathSeparator);
+  let pathIndex = pathArray.length;
+
+  while (pathIndex > 0) {
+    // walk up path tree until we find the nearest vnode
+    const path = pathArray.slice(0, pathIndex)
+      .join(pathSeparator);
     const value = getTreeValue(path);
     if (valueTypes.isType(
       value,
@@ -31,22 +55,25 @@ const findParentVnode = (currentPath) => {
     )) {
       return value;
     }
-    i -= 1;
+    pathIndex -= 1;
   }
 
   return 'noParentVnodeFound';
 };
 
 const cleanupOnDestroy = (
-  type, refId, modelKey,
+  type, refId, { key, shouldDestroy },
 ) => {
-  // console.log('[hook]', type, refId, modelKey);
-  const model = activeModels.get(modelKey);
+  // console.log('[hook]', type, refId, key);
+  const scopedModels = getScopedModels(refId);
+  const model = scopedModels.get(key);
 
   switch (type) {
   case 'destroy':
-    activeModels.delete(modelKey);
-    removeWatch(model, 'reRender');
+    removeWatch(model, refId);
+    if (shouldDestroy()) {
+      scopedModels.delete(key);
+    }
     break;
   default:
     break;
@@ -151,9 +178,6 @@ const useUpdate = (refId) => {
   };
 };
 
-const getScopedKey = (refId, key) =>
-  `${refId}--${key}`;
-
 const initModel = (initialModel) =>
   atom(
     isFunc(initialModel)
@@ -161,32 +185,53 @@ const initModel = (initialModel) =>
       : initialModel,
   );
 
+const defaultMeta = {
+  shouldDestroy: () =>
+    true,
+};
+
 const useModel = (
   refId,
-  modelKey = '@model',
+  key = refId,
   initialModel,
+  meta = defaultMeta,
 ) => {
-  const scopedKey = getScopedKey(refId, modelKey);
-  const model = activeModels.get(scopedKey)
+  const scopedModels = getScopedModels(refId);
+
+  if (!scopedModels) {
+    setupScopedModels(refId);
+    return useModel(refId, key, initialModel, meta);
+  }
+
+  const model = scopedModels.get(key)
     || initModel(initialModel);
   const update = useUpdate(refId);
+  const {
+    shouldDestroy = defaultMeta.shouldDestroy,
+  } = meta;
 
-  activeModels.set(scopedKey, model);
-  addWatch(model, 'reRender', update);
-  useHook(refId, cleanupOnDestroy, scopedKey);
-
-  console.log(activeModels);
+  scopedModels.set(key, model);
+  addWatch(model, refId, update);
+  useHook(refId, cleanupOnDestroy,
+    { key, shouldDestroy });
 
   return model;
 };
 
-const hasModel = (refId, modelKey) =>
-  activeModels.has(
-    getScopedKey(refId, modelKey),
-  );
+const emptyMap = new Map();
+
+const hasModel = (refId, key) =>
+  withDefault(
+    getScopedModels(refId),
+    emptyMap,
+  ).has(key);
+
+const getAllModels = (refId) =>
+  getScopedModels(refId);
 
 export {
   useModel,
   hasModel,
+  getAllModels,
   useUpdate,
 };

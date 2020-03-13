@@ -18,6 +18,10 @@ export const setValue = (obj, key, value) => {
 export const isFunc = (v) =>
   typeof v === 'function';
 
+export const withDefault = (value, fallback) =>
+  (isDef(value)
+    ? value : fallback);
+
 export const stringifyValueForLogging = (
   value,
 ) => {
