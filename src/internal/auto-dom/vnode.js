@@ -191,7 +191,7 @@ const builtinHooks = {
       (vnode) => {
         hookDebug('[init]', vnode);
 
-        const { customHooks = emptyArr } = vnode;
+        const { customHooks } = vnode;
         customHooks.forEach(initCallback);
       },
     ([refId, fn, arg]) => {
@@ -200,45 +200,33 @@ const builtinHooks = {
   ),
   prepatch(oldVnode, vnode) {
     hookDebug('[prepatch]', oldVnode, vnode);
-    // hooksByRefId.delete($$refId);
   },
-  update(oldVnode, vnode) {
-    /**
-     * This check helps differentiate if it was
-     * a true update or that it was a component switch.
-     */
-    const isComponentSwitch = oldVnode.ctor !== vnode.ctor
-      /**
-       * snabbdom provides an empty vnode on the first
-       * `patch` call. We know how the vnode was created
-       * by checking the `type` property because it is
-       * added by our own api.
-       */
-      && isType(oldVnode, valueTypes.vnode);
-    if (isComponentSwitch) {
-      /**
-       * @TODO
-       * This is where we should trigger a `destroy` hook for
-       * the old vnode, and an `init` hook for the new vnode.
-       */
-      // hookDebug(
-      //   '[update -> new_component]',
-      //   '\n\n',
-      //   oldVnode.ctor,
-      //   '\n\n',
-      //   vnode.ctor,
-      // );
-
-      // return;
-    }
-
-    const updateType = isComponentSwitch
-      ? '[update -> new_component]' : '[update]';
-    hookDebug(updateType, oldVnode, vnode);
-    const { customHooks = emptyArr } = vnode;
-    customHooks.forEach(([refId, fn, arg]) =>
-      fn(updateType, refId, arg));
-  },
+  update: exec(
+    (updateCallback) =>
+      (oldVnode, vnode) => {
+        /**
+         * This check helps differentiate if it was
+         * a true update or that it was a component switch.
+         */
+        const isComponentSwitch = oldVnode.ctor
+          !== vnode.ctor
+          /**
+           * snabbdom provides an empty vnode on the first
+           * `patch` call. We know how the vnode was created
+           * by checking the `type` property because it is
+           * added by our own api.
+           */
+          && isType(oldVnode, valueTypes.vnode);
+        const updateType = isComponentSwitch
+          ? '[update -> new_component]' : '[update]';
+        hookDebug(updateType, oldVnode, vnode);
+        const { customHooks } = vnode;
+        customHooks.forEach(updateCallback, updateType);
+      },
+    function updateCallback([refId, fn, arg]) {
+      fn(this, refId, arg);
+    },
+  ),
   postpatch(oldVnode, vnode) {
     hookDebug('[postpatch]', oldVnode, vnode);
   },
@@ -246,7 +234,7 @@ const builtinHooks = {
     (hookCallback) =>
       (vnode) => {
         hookDebug('[destroy]', vnode);
-        const { customHooks = emptyArr } = vnode;
+        const { customHooks } = vnode;
         const { $$refId: vnodeId } = vnode.props;
 
         customHooks.forEach(hookCallback);
