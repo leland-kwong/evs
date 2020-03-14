@@ -21,8 +21,8 @@ export const emptyObj = Object.freeze({});
 
 export const emptyArr = Object.freeze([]);
 
-export const noCurrentProps = Symbol(
-  '@noCurrentProps',
+export const noCurrentConfig = Symbol(
+  '@noCurrentConfig',
 );
 
 export const noCurrentDispatcher = Symbol(

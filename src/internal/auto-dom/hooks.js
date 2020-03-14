@@ -17,7 +17,7 @@ import {
   createElement,
 } from './element';
 import {
-  getCurrentProps,
+  getCurrentConfig,
   getCurrentDispatcher,
 } from './render-context';
 
@@ -95,7 +95,7 @@ const cleanupOnDestroy = (
 const updateSourceValue = Object.assign;
 
 const forceUpdate = (refId) => {
-  const currentProps = getCurrentProps(refId);
+  const { props: currentProps } = getCurrentConfig(refId);
   const dispatcher = getCurrentDispatcher(refId);
   const pathArray = refId.split(pathSeparator);
   const isVtreeRoot = pathArray.length === 1;

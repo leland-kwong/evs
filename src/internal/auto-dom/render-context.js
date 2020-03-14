@@ -1,5 +1,5 @@
 import {
-  noCurrentProps,
+  noCurrentConfig,
   noCurrentDispatcher,
 } from '../constants';
 
@@ -15,12 +15,12 @@ const currentDispatcher = new Map();
  * @returns {Object} current active props context
  * that is being rendered with.
  */
-const getCurrentProps = (refId) =>
+const getCurrentConfig = (refId) =>
   (currentContext.has(refId)
     ? currentContext.get(refId)
-    : noCurrentProps);
+    : noCurrentConfig);
 
-const setCurrentProps = (refId, value) => {
+const setCurrentConfig = (refId, value) => {
   currentContext.set(refId, value);
 };
 
@@ -43,8 +43,8 @@ const clearRenderContext = (refId) => {
 };
 
 export {
-  getCurrentProps,
-  setCurrentProps,
+  getCurrentConfig,
+  setCurrentConfig,
   getCurrentDispatcher,
   setCurrentDispatcher,
   clearRenderContext,

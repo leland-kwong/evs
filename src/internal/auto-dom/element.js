@@ -30,7 +30,7 @@ import {
 } from '../constants';
 import * as valueTypes from './value-types';
 import {
-  setCurrentProps,
+  setCurrentConfig,
   setCurrentDispatcher,
 } from './render-context';
 
@@ -271,7 +271,7 @@ const processLisp = (
      * dispatcher, so the code inside the dispatcher
      * gets the right information.
      */
-  setCurrentProps($$refId, fInput);
+  setCurrentConfig($$refId, config);
   setCurrentDispatcher($$refId, f);
 
   const nextValue = f(fInput);
@@ -437,7 +437,7 @@ export {
 };
 
 export {
-  getCurrentProps,
+  getCurrentConfig,
   getCurrentDispatcher,
 } from './render-context';
 
