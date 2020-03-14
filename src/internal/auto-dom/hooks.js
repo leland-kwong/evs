@@ -135,16 +135,24 @@ const forceUpdate = (refId) => {
   /**
    * Update the old fragment with the new value
    */
-  const newChildren = oChildren.map((ch) => {
-    const isCurrentFragment = isArray(ch)
+  const processChildren = (ch) => {
+    const isFragmentChild = isArray(ch);
+    const isCurrentFragment = isFragmentChild
       && ch[0].refId === currentValue[0].refId;
 
     if (isCurrentFragment) {
       return nextValue;
     }
 
-    return ch;
-  });
+    return isFragmentChild
+      /**
+       * recursively handle children in case of
+       * nested fragments
+       */
+      ? ch.map(processChildren)
+      : ch;
+  };
+  const newChildren = oChildren.map(processChildren);
   /**
    * Create the new parent vnode by copying it and
    * updating the original children props with the
