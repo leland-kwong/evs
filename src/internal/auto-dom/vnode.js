@@ -4,8 +4,11 @@ import { getSupportedEventTypes } from '../../get-event-types';
 import { invalidComponentMsg } from './invalid-component-msg';
 import { string } from '../string';
 import { isArray, isFunc,
-  setValue, stringifyValueForLogging, isDef } from '../utils';
+  setValue, stringifyValueForLogging, isDef, exec } from '../utils';
 import { emptyArr } from '../constants';
+import {
+  clearRenderContext,
+} from './render-context';
 import * as valueTypes from './value-types';
 
 const hookDebug = createDebug('vnode-hook');
@@ -32,8 +35,6 @@ const hasTreeValue = (refId) =>
 const deleteTreeValue = (refId) => {
   treeValues.delete(refId);
 };
-const getFullTree = () =>
-  treeValues;
 
 const { isType } = valueTypes;
 
@@ -185,16 +186,18 @@ const primitiveTypes = new Set([
 ]);
 
 const builtinHooks = {
-  init(vnode) {
-    hookDebug('[init]', vnode);
+  init: exec(
+    (initCallback) =>
+      (vnode) => {
+        hookDebug('[init]', vnode);
 
-    const { customHooks = emptyArr } = vnode;
-    // const customHooks = hooksByRefId.get($$refId) || emptyArr;
-    customHooks.forEach(([refId, fn, arg]) =>
-      fn('init', refId, arg, vnode));
-    // previousHooks.set($$refId, customHooks);
-    // hooksByRefId.delete($$refId);
-  },
+        const { customHooks = emptyArr } = vnode;
+        customHooks.forEach(initCallback);
+      },
+    ([refId, fn, arg]) => {
+      fn('init', refId, arg);
+    },
+  ),
   prepatch(oldVnode, vnode) {
     hookDebug('[prepatch]', oldVnode, vnode);
     // hooksByRefId.delete($$refId);
@@ -234,18 +237,26 @@ const builtinHooks = {
     hookDebug(updateType, oldVnode, vnode);
     const { customHooks = emptyArr } = vnode;
     customHooks.forEach(([refId, fn, arg]) =>
-      fn(updateType, refId, arg, vnode));
+      fn(updateType, refId, arg));
   },
   postpatch(oldVnode, vnode) {
     hookDebug('[postpatch]', oldVnode, vnode);
   },
-  destroy(vnode) {
-    hookDebug('[destroy]', vnode);
-    const { customHooks = emptyArr } = vnode;
-    customHooks.forEach(([refId, fn, arg]) =>
-      fn('destroy', refId, arg, vnode));
-    deleteTreeValue(vnode.props.$$refId);
-  },
+  destroy: exec(
+    (hookCallback) =>
+      (vnode) => {
+        hookDebug('[destroy]', vnode);
+        const { customHooks = emptyArr } = vnode;
+        const { $$refId: vnodeId } = vnode.props;
+
+        customHooks.forEach(hookCallback);
+        deleteTreeValue(vnodeId);
+        clearRenderContext(vnodeId);
+      },
+    ([refId, fn, arg]) => {
+      fn('destroy', refId, arg);
+    },
+  ),
 };
 
 const createVnode = (tagNameOrVnode, config) => {
@@ -338,5 +349,4 @@ export {
   getTreeValue,
   hasTreeValue,
   setTreeValue,
-  getFullTree,
 };

@@ -44,3 +44,6 @@ export const stringifyValueForLogging = (
     return v;
   });
 };
+
+export const exec = (fn, arg) =>
+  fn(arg);

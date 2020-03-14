@@ -37,9 +37,15 @@ const setCurrentDispatcher = (refId, value) => {
   currentDispatcher.set(refId, value);
 };
 
+const clearRenderContext = (refId) => {
+  currentContext.delete(refId);
+  currentDispatcher.delete(refId);
+};
+
 export {
   getCurrentProps,
   setCurrentProps,
   getCurrentDispatcher,
   setCurrentDispatcher,
+  clearRenderContext,
 };
