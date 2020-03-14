@@ -3,9 +3,10 @@ import {
   createVnode,
   getTreeValue,
   enqueueHook as useHook,
+  getFullTree,
+  setTreeValue,
 } from './vnode';
 import {
-  noCurrentDispatcher,
   pathSeparator,
 } from '../constants';
 import {
@@ -62,19 +63,31 @@ const findParentVnode = (currentPath) => {
 };
 
 const cleanupOnDestroy = (
-  type, refId, { key, shouldDestroy },
+  type,
+  refId,
+  { key, shouldDestroy, watcherFn },
 ) => {
   // console.log('[hook]', type, refId, key);
   const scopedModels = getScopedModels(refId);
   const model = scopedModels.get(key);
 
   switch (type) {
-  case 'destroy':
+  case 'destroy': {
+    const currentWatcher = model.watchersList
+      .get(refId);
+    const isWatcherReplaced = currentWatcher
+      !== watcherFn;
+
+    if (isWatcherReplaced) {
+      return;
+    }
+
     removeWatch(model, refId);
     if (shouldDestroy()) {
       scopedModels.delete(key);
     }
     break;
+  }
   default:
     break;
   }
@@ -83,21 +96,19 @@ const cleanupOnDestroy = (
 const forceUpdate = (
   refId, dispatcher, currentProps,
 ) => {
+  const isRoot = refId.indexOf(pathSeparator) === -1;
   const currentValue = getTreeValue(refId);
   /**
    * We know its a fragment if the returned value
    * is a collection of vnodes
    */
   const isFragment = isArray(currentValue);
-  const nextValue = createElement(
-    [dispatcher, currentProps],
-    refId,
-  );
 
   if (!isFragment) {
-    renderWith(
-      currentValue, nextValue,
-      refId, identity,
+    const onPathValue = isRoot ? setTreeValue : identity;
+    const nextValue = renderWith(
+      currentValue, [dispatcher, currentProps],
+      refId, onPathValue,
     );
     /**
      * mutate original with tne new values since the
@@ -115,6 +126,10 @@ const forceUpdate = (
    */
   const parentVnode = findParentVnode(refId);
   const { children: oChildren } = parentVnode.props;
+  const nextValue = createElement(
+    [dispatcher, currentProps],
+    refId,
+  );
   /**
    * Update the old fragment with the new value
    */
@@ -167,12 +182,6 @@ const useUpdate = (refId) => {
   const currentProps = getCurrentProps(refId);
   const dispatcher = getCurrentDispatcher(refId);
 
-  if (dispatcher === noCurrentDispatcher) {
-    throw new Error(
-      '[useUpdate] must be called during the render phase',
-    );
-  }
-
   return () => {
     forceUpdate(refId, dispatcher, currentProps);
   };
@@ -213,7 +222,7 @@ const useModel = (
   scopedModels.set(key, model);
   addWatch(model, refId, update);
   useHook(refId, cleanupOnDestroy,
-    { key, shouldDestroy });
+    { key, shouldDestroy, watcherFn: update });
 
   return model;
 };

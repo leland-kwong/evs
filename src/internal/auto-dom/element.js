@@ -16,6 +16,7 @@ import {
   ignoredValues,
   validateVnodeValue,
   setTreeValue,
+  hasTreeValue,
 } from './vnode';
 import { string } from '../string';
 import { isArray, isFunc,
@@ -25,6 +26,7 @@ import { isArray, isFunc,
 import {
   emptyArr,
   pathSeparator,
+  nextPathKey,
 } from '../constants';
 import * as valueTypes from './value-types';
 import {
@@ -39,9 +41,11 @@ const vnodeKeyTypes = {
   number: true,
 };
 
+const newPath = Symbol('newPath');
+
 const keyRegex = /^[a-zA-Z0-9-_@/]*$/;
 
-const validateKey = (key) => {
+const validateKey = (key, keyType = 'key') => {
   if (process.env.NODE_ENV !== 'development') {
     return key;
   }
@@ -49,13 +53,13 @@ const validateKey = (key) => {
   if (isDef(key)) {
     if (!vnodeKeyTypes[typeof key]) {
       throw new Error(string([
-        'Key may only be a string or number. ',
+        `${keyType} may only be a string or number. `,
         `Received: ${stringifyValueForLogging(key)}`,
       ]));
     } else if (!keyRegex.test(key)) {
       throw new Error(string([
-        `Key must satisfy the this pattern ${keyRegex}. `,
-        `Received: ${stringifyValueForLogging(key)}`,
+        `${keyType} must satisfy this pattern: ${keyRegex}. `,
+        `Received: \`${stringifyValueForLogging(key)}\``,
       ]));
     }
   }
@@ -67,8 +71,13 @@ const patch = snabbdomInit([
   snabbdomProps,
 ]);
 
-const addToRefId = (currentPath, location) =>
-  `${currentPath}${pathSeparator}${location}`;
+const addToRefId = (currentPath, location) => {
+  if (currentPath === newPath) {
+    return location;
+  }
+
+  return `${currentPath}${pathSeparator}${location}`;
+};
 
 /**
  * Makes a new list of arguments. This also
@@ -93,8 +102,7 @@ const prepareArgs = (
   while (i < args.length) {
     const argIndex = i + skip;
     const arg = lisp[argIndex];
-    const refId = addToRefId(path, i);
-    const evaluated = callback(arg, refId, i, prevCtor, onPathValue);
+    const evaluated = callback(arg, path, i, prevCtor, onPathValue);
 
     args[i] = evaluated;
     i += 1;
@@ -151,20 +159,15 @@ const parseProps = (
   prevKey, ctor, onPathValue,
 ) => {
   const props = getPropsFromArgs(value);
-  const lastDotIndex = path.lastIndexOf('.');
+
+  /**
+   * validate the original key since
+   * we use a default one later on
+   */
+  validateKey(props.key);
+
   const { key = prevKey } = props;
-  const refId = isDef(key)
-    /**
-     * Replace last position of path with key so that
-     * the path remains consistent when an element's
-     * position changes amongst its siblings.
-     */
-    ? addToRefId(
-      path.slice(0, lastDotIndex !== -1
-        ? lastDotIndex : path.length),
-      key,
-    )
-    : path;
+  const refId = addToRefId(path, key);
   const skipValues = !props.empty ? 2 : 1;
   const args = prepareArgs(
     value, argProcessor, refId,
@@ -172,7 +175,7 @@ const parseProps = (
   );
   const baseConfig = {
     props: {
-      key: validateKey(key),
+      key,
       $$refId: refId,
       children: args,
     },
@@ -229,9 +232,8 @@ const processLisp = (
          * siblings are shuffled, form controls can
          * still maintain their focus.
          */
-        const nextPath = addToRefId(path, defaultKey);
         const result = processLisp(
-          v, nextPath, defaultKey,
+          v, path, defaultKey,
           prevCtor, onPathValue,
         );
         return result;
@@ -261,20 +263,24 @@ const processLisp = (
     prevKey, nextCtor, onPathValue,
   );
   const fInput = isDomComp ? config : config.props;
-  const { props: { key = prevKey, $$refId } } = config;
+  const { props: { $$refId } } = config;
 
   /**
-   * @important
-   * this should be called before executing the
-   * dispatcher, so the code inside the dispatcher
-   * gets the right information.
-   */
+     * @important
+     * this must be called before executing the
+     * dispatcher, so the code inside the dispatcher
+     * gets the right information.
+     */
   setCurrentProps($$refId, fInput);
   setCurrentDispatcher($$refId, f);
 
   const nextValue = f(fInput);
   const finalValue = processLisp(
-    nextValue, $$refId, key, nextCtor, onPathValue,
+    nextValue,
+    $$refId,
+    nextPathKey,
+    nextCtor,
+    onPathValue,
   );
 
   onPathValue($$refId, finalValue);
@@ -282,12 +288,20 @@ const processLisp = (
 };
 
 const validateSeedPath = (seedPath) => {
+  const isPreExistingPath = hasTreeValue(seedPath);
+
+  if (isPreExistingPath) {
+    return;
+  }
+
   if (!vnodeKeyTypes[typeof seedPath]) {
     throw new Error(string([
       '[createElement] `seedPath` must be one of types: ',
       `[${Object.keys(vnodeKeyTypes)}]`,
     ]));
   }
+
+  validateKey(seedPath, 'seedPath');
 };
 
 /**
@@ -295,7 +309,11 @@ const validateSeedPath = (seedPath) => {
  * @param {String | Number} seedPath id prefix
  * @returns vnode
  */
-const createElement = (value, seedPath, onPathValue = identity) => {
+const createElement = (
+  value,
+  seedPath,
+  onPathValue = identity,
+) => {
   if (process.env.NODE_ENV === 'development') {
     validateSeedPath(seedPath);
   }
@@ -306,11 +324,12 @@ const createElement = (value, seedPath, onPathValue = identity) => {
 
   const vtree = processLisp(
     value,
+    newPath,
     String(seedPath),
-    undefined,
     undefined,
     onPathValue,
   );
+
   return vtree;
 };
 
@@ -356,16 +375,14 @@ nativeElements.comment = defineElement('!');
 
 /*
  * TODO:
- * Add support for rendering an array of vnodes
+ * Add support for rendering a fragment
  * so we don't require a single parent vnode.
  */
 const renderWith = (
   fromNode,
   component,
   seedPath,
-  onPathValue = (refId, nextVal) => {
-    setTreeValue(refId, nextVal);
-  },
+  onPathValue = setTreeValue,
 ) => {
   const toNode = createElement(
     component, seedPath, onPathValue,

@@ -9,7 +9,7 @@ import {
 } from './prototype.ldom';
 import * as styles from './styles';
 import { TodoApp } from './todo-app';
-import { useModel } from '../src/internal/auto-dom';
+import { useModel, getAllModels } from '../src/internal/auto-dom';
 
 function benchFn(
   fn, arg, numTests,
@@ -36,10 +36,10 @@ function benchFn(
   document.body.appendChild(rootDom);
 
   const A = nativeElements;
-  const { swap } = atomicState;
+  const { swap, read } = atomicState;
 
   const BenchCreateElement = ({ size = 1000, numTests = 5 }) => {
-    const seedPath = Math.random().toString(32);
+    const seedPath = Math.random().toString(32).slice(2);
     const range = Array(size).fill(0);
     const onNameChange = () => {};
     const test = () => {
@@ -122,6 +122,58 @@ function benchFn(
     }
   };
 
+  const useModalModel = (
+    refId,
+    initialState = { opened: true },
+  ) => {
+    console.log('refId', refId);
+
+    return useModel(refId, 'Modal', initialState, {
+      shouldDestroy: () =>
+        false,
+    });
+  };
+
+  const setModalOpen = (refId, isOpened) => {
+    const model = useModalModel(refId);
+    swap(
+      model,
+      (state, opened = !state.opened) =>
+        ({
+          ...state,
+          opened,
+        }),
+      isOpened,
+    );
+    console.log(read(model));
+  };
+
+  const Modal = ({ $$refId }) => {
+    const modalModel = useModalModel($$refId);
+    const data = read(modalModel);
+
+    console.log('[modal render]', getAllModels($$refId));
+
+    if (!data.opened) {
+      return null;
+    }
+
+    return (
+      [A.div,
+        [A.h2, 'Modal title'],
+        [A.div, 'Modal body']]
+    );
+  };
+
+  const ModalToggleBtn = ({
+    $$refId: refId,
+  }) =>
+    ([A.button,
+      { onClick() {
+        setModalOpen(refId);
+      } },
+      'Toggle modal']);
+
   const View = ({ $$refId }) => {
     const model = useModel($$refId, $$refId, defaultState);
     const data = atomicState.read(model);
@@ -186,6 +238,15 @@ function benchFn(
       ]
     );
 
+    const conditionalTodoApp = (
+      data.name.length < 10
+        ? [TodoApp,
+          { key: 'TodoApp',
+            name: data.name },
+        ]
+        : [A.comment]
+    );
+
     return (
       [A.div,
         { class: css`
@@ -194,23 +255,23 @@ function benchFn(
             padding: 1rem;
           ` },
         mainStyle,
-        data.name.length < 10
-          ? [TodoApp,
-            { key: 'TodoApp',
-              name: data.name },
-          ]
-          : [A.comment],
+        conditionalTodoApp,
+
+        [A.div,
+          [Modal],
+          [ModalToggleBtn]],
 
         [TodoApp],
         [PerfTests],
-        [Hello, { name: data.name,
-                  onNameChange(newName) {
-                    swap(model, rootReducer, {
-                      type: 'SetName',
-                      name: newName,
-                    });
-                  },
-                  key: 'HelloRoot' }],
+        [Hello,
+          { name: data.name,
+            onNameChange(newName) {
+              swap(model, rootReducer, {
+                type: 'SetName',
+                name: newName,
+              });
+            },
+            key: 'HelloRoot' }],
       ]);
   };
 

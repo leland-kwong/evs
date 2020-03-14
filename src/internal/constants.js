@@ -15,6 +15,8 @@ export const domNodeTypes = {
   element: 1,
 };
 
+export const nextPathKey = '_@';
+
 export const emptyObj = Object.freeze({});
 
 export const emptyArr = Object.freeze([]);

@@ -27,6 +27,8 @@ const getTreeValue = (refId) =>
 const setTreeValue = (refId, value) => {
   treeValues.set(refId, value);
 };
+const hasTreeValue = (refId) =>
+  treeValues.has(refId);
 const deleteTreeValue = (refId) => {
   treeValues.delete(refId);
 };
@@ -184,6 +186,8 @@ const primitiveTypes = new Set([
 
 const builtinHooks = {
   init(vnode) {
+    hookDebug('[init]', vnode);
+
     const { customHooks = emptyArr } = vnode;
     // const customHooks = hooksByRefId.get($$refId) || emptyArr;
     customHooks.forEach(([refId, fn, arg]) =>
@@ -316,6 +320,7 @@ const createVnode = (tagNameOrVnode, config) => {
     type: valueTypes.vnode,
     ctor,
   };
+
   return vnode;
 };
 
@@ -331,6 +336,7 @@ export {
   enqueueHook,
 
   getTreeValue,
+  hasTreeValue,
   setTreeValue,
   getFullTree,
 };

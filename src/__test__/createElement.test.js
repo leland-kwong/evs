@@ -4,6 +4,7 @@ import {
   valueTypes,
 } from '../internal/auto-dom';
 import { isArray } from '../internal/utils';
+import { nextPathKey } from '../internal/constants';
 
 const seedPath = 'seedPath';
 
@@ -55,7 +56,7 @@ describe('createElement', () => {
 
       expect(
         element.props.$$refId,
-      ).toEqual(seedPath);
+      ).toEqual([seedPath, nextPathKey].join('.'));
     });
 
     describe('deep ref id', () => {
@@ -75,7 +76,7 @@ describe('createElement', () => {
             .children[0]
             .children[0].props.$$refId,
         ).toEqual(
-          [seedPath, 0, 0, 0].join('.'),
+          [seedPath, nextPathKey, 0, 0].join('.'),
         );
 
         expect(
@@ -83,7 +84,7 @@ describe('createElement', () => {
             .children[0]
             .children[1].props.$$refId,
         ).toEqual(
-          [seedPath, 0, 0, 1].join('.'),
+          [seedPath, nextPathKey, 0, 1].join('.'),
         );
       });
     });
@@ -127,8 +128,8 @@ describe('createElement', () => {
             vnode.key),
         ).toEqual(
           [
-            [seedPath, parentKey, 0].join('.'),
-            [seedPath, parentKey, 1].join('.'),
+            [parentKey, 0].join('.'),
+            [parentKey, 1].join('.'),
           ],
         );
       });
@@ -177,7 +178,7 @@ describe('createElement', () => {
     test('key transfers through to vnode', () => {
       expect(
         element.key,
-      ).toBe([seedPath, key].join('.'));
+      ).toBe([key, nextPathKey].join('.'));
     });
   });
 
@@ -192,7 +193,7 @@ describe('createElement', () => {
     test('key replaces last part of refId', () => {
       expect(
         element.props.children[0].props.$$refId,
-      ).toBe([seedPath, key].join('.'));
+      ).toBe([seedPath, nextPathKey, key].join('.'));
     });
   });
 
@@ -281,12 +282,12 @@ describe('createElement', () => {
         toKeysTree(value),
       ).toEqual([
         [
-          [seedPath, parentKey, 0, 0].join('.'),
-          [seedPath, parentKey, 0, 1].join('.'),
+          [parentKey, 0].join('.'),
+          [parentKey, 1].join('.'),
         ],
         [
           [
-            [seedPath, parentKey, 1, 0, 0].join('.'),
+            [parentKey, 1, 0].join('.'),
           ],
           [],
         ],
