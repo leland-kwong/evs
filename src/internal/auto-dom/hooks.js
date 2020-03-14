@@ -2,7 +2,7 @@ import { addWatch, removeWatch, atom } from 'atomic-state';
 import {
   createVnode,
   getTreeValue,
-  enqueueHook as useHook,
+  enqueueHook,
   setTreeValue,
 } from './vnode';
 import {
@@ -216,7 +216,7 @@ const useModel = (
 
   scopedModels.set(key, model);
   addWatch(model, refId, update);
-  useHook(refId, cleanupOnDestroy,
+  enqueueHook(refId, cleanupOnDestroy,
     { key, shouldCleanup, watcherFn: update });
 
   return model;
