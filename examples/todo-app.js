@@ -200,7 +200,7 @@ const noAsyncData = 'noAsyncData';
 
 const useAsync = (() => {
   const modelMeta = {
-    shouldDestroy: () =>
+    shouldCleanup: () =>
       false,
   };
 

@@ -129,7 +129,7 @@ function benchFn(
     console.log('refId', refId);
 
     return useModel(refId, 'Modal', initialState, {
-      shouldDestroy: () =>
+      shouldCleanup: () =>
         false,
     });
   };

@@ -3,7 +3,6 @@ import {
   createVnode,
   getTreeValue,
   enqueueHook as useHook,
-  getFullTree,
   setTreeValue,
 } from './vnode';
 import {
@@ -41,8 +40,7 @@ const setupScopedModels = (path) =>
     getPathRoot(path), new Map(),
   );
 
-const findParentVnode = (currentPath) => {
-  const pathArray = currentPath.split(pathSeparator);
+const findParentVnode = (pathArray) => {
   let pathIndex = pathArray.length;
 
   while (pathIndex > 0) {
@@ -65,9 +63,8 @@ const findParentVnode = (currentPath) => {
 const cleanupOnDestroy = (
   type,
   refId,
-  { key, shouldDestroy, watcherFn },
+  { key, shouldCleanup, watcherFn },
 ) => {
-  // console.log('[hook]', type, refId, key);
   const scopedModels = getScopedModels(refId);
   const model = scopedModels.get(key);
 
@@ -83,9 +80,11 @@ const cleanupOnDestroy = (
     }
 
     removeWatch(model, refId);
-    if (shouldDestroy()) {
+
+    if (shouldCleanup()) {
       scopedModels.delete(key);
     }
+
     break;
   }
   default:
@@ -93,10 +92,13 @@ const cleanupOnDestroy = (
   }
 };
 
-const forceUpdate = (
-  refId, dispatcher, currentProps,
-) => {
-  const isRoot = refId.indexOf(pathSeparator) === -1;
+const updateSourceValue = Object.assign;
+
+const forceUpdate = (refId) => {
+  const currentProps = getCurrentProps(refId);
+  const dispatcher = getCurrentDispatcher(refId);
+  const pathArray = refId.split(pathSeparator);
+  const isVtreeRoot = pathArray.length === 1;
   const currentValue = getTreeValue(refId);
   /**
    * We know its a fragment if the returned value
@@ -105,17 +107,17 @@ const forceUpdate = (
   const isFragment = isArray(currentValue);
 
   if (!isFragment) {
-    const onPathValue = isRoot ? setTreeValue : identity;
+    const onPathValue = isVtreeRoot ? setTreeValue : identity;
     const nextValue = renderWith(
       currentValue, [dispatcher, currentProps],
       refId, onPathValue,
     );
     /**
-     * mutate original with tne new values since the
+     * mutate original with the new values since the
      * source vtree will need the updates when we do
      * a rerender of the full vtree.
      */
-    Object.assign(currentValue, nextValue);
+    updateSourceValue(currentValue, nextValue);
     return;
   }
 
@@ -124,7 +126,7 @@ const forceUpdate = (
    * parent vnode and updating its children
    * using the new fragment.
    */
-  const parentVnode = findParentVnode(refId);
+  const parentVnode = findParentVnode(pathArray);
   const { children: oChildren } = parentVnode.props;
   const nextValue = createElement(
     [dispatcher, currentProps],
@@ -175,16 +177,7 @@ const forceUpdate = (
     parentVnode, nextParentVnode,
     parentRefId, identity,
   );
-  Object.assign(parentVnode, nextParentVnode);
-};
-
-const useUpdate = (refId) => {
-  const currentProps = getCurrentProps(refId);
-  const dispatcher = getCurrentDispatcher(refId);
-
-  return () => {
-    forceUpdate(refId, dispatcher, currentProps);
-  };
+  updateSourceValue(parentVnode, nextParentVnode);
 };
 
 const initModel = (initialModel) =>
@@ -194,8 +187,8 @@ const initModel = (initialModel) =>
       : initialModel,
   );
 
-const defaultMeta = {
-  shouldDestroy: () =>
+const defaultOptions = {
+  shouldCleanup: () =>
     true,
 };
 
@@ -203,26 +196,28 @@ const useModel = (
   refId,
   key = refId,
   initialModel,
-  meta = defaultMeta,
+  options = defaultOptions,
 ) => {
+  const im = initialModel;
   const scopedModels = getScopedModels(refId);
 
   if (!scopedModels) {
     setupScopedModels(refId);
-    return useModel(refId, key, initialModel, meta);
+    return useModel(refId, key, im, options);
   }
 
   const model = scopedModels.get(key)
-    || initModel(initialModel);
-  const update = useUpdate(refId);
+    || initModel(im);
   const {
-    shouldDestroy = defaultMeta.shouldDestroy,
-  } = meta;
+    shouldCleanup = defaultOptions.shouldCleanup,
+  } = options;
+  const update = () =>
+    forceUpdate(refId);
 
   scopedModels.set(key, model);
   addWatch(model, refId, update);
   useHook(refId, cleanupOnDestroy,
-    { key, shouldDestroy, watcherFn: update });
+    { key, shouldCleanup, watcherFn: update });
 
   return model;
 };
@@ -242,5 +237,5 @@ export {
   useModel,
   hasModel,
   getAllModels,
-  useUpdate,
+  forceUpdate,
 };
