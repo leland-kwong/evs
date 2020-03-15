@@ -94,6 +94,12 @@ const cleanupOnDestroy = (
 
 const updateSourceValue = Object.assign;
 
+/**
+ * @important
+ * Any vnode that gets updated must also update
+ * the original source value, otherwise the rerender
+ * of the root will not have latest changes.
+ */
 const forceUpdate = (refId) => {
   const { props: currentProps } = getCurrentConfig(refId);
   const dispatcher = getCurrentDispatcher(refId);
@@ -112,11 +118,7 @@ const forceUpdate = (refId) => {
       currentValue, [dispatcher, currentProps],
       refId, onPathValue,
     );
-    /**
-     * mutate original with the new values since the
-     * source vtree will need the updates when we do
-     * a rerender of the full vtree.
-     */
+
     updateSourceValue(currentValue, nextValue);
     return;
   }
@@ -141,12 +143,13 @@ const forceUpdate = (refId) => {
       && ch[0].refId === currentValue[0].refId;
 
     if (isCurrentFragment) {
+      updateSourceValue(currentValue, nextValue);
       return nextValue;
     }
 
     return isFragmentChild
       /**
-       * recursively handle children in case of
+       * recursively handle children for any
        * nested fragments
        */
       ? ch.map(processChildren)
@@ -181,6 +184,7 @@ const forceUpdate = (refId) => {
   const {
     $$refId: parentRefId,
   } = parentVnode.props;
+
   renderWith(
     parentVnode, nextParentVnode,
     parentRefId, identity,
