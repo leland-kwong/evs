@@ -47,3 +47,6 @@ export const stringifyValueForLogging = (
 
 export const exec = (fn, arg) =>
   fn(arg);
+
+export const alwaysTrue = () =>
+  true;

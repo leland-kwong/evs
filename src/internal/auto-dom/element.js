@@ -1,10 +1,3 @@
-/**
- * @TODO
- * Add check for reusing a vnode between two components in the tree.
- * Snabbdom stores dom node references on vnodes, so if we share a
- * vnode in the tree, we will have race conditions during re-renders.
- */
-
 import isPlainObject from 'is-plain-object';
 import { init as snabbdomInit } from 'snabbdom';
 import snabbdomProps from './snabbdom-modules/props';
@@ -17,19 +10,26 @@ import {
   validateVnodeValue,
   setTreeValue,
   hasTreeValue,
+  getTreeValue,
+  onVtreeCompleted,
 } from './vnode';
 import { string } from '../string';
-import { isArray, isFunc,
+import {
+  isArray,
+  isFunc,
   isDef,
   stringifyValueForLogging,
-  identity } from '../utils';
+  identity,
+} from '../utils';
 import {
   emptyArr,
   pathSeparator,
   nextPathKey,
+  noCurrentConfig,
 } from '../constants';
 import * as valueTypes from './value-types';
 import {
+  getCurrentConfig,
   setCurrentConfig,
   setCurrentDispatcher,
 } from './render-context';
@@ -96,7 +96,7 @@ const prepareArgs = (
   const { length } = lisp;
   const argsLength = Math.max(0, length - skip);
   // mutated in while loop
-  const args = new Array(argsLength);
+  const args = Array(argsLength);
   let i = 0;
 
   while (i < args.length) {
@@ -112,7 +112,7 @@ const prepareArgs = (
 };
 
 const emptyProps = {};
-Object.defineProperty(emptyProps, 'empty', {
+Object.defineProperty(emptyProps, '$$empty', {
   value: true,
 });
 Object.freeze(emptyProps);
@@ -149,6 +149,9 @@ const getPropsFromArgs = (value) => {
   return hasProps ? firstArg : emptyProps;
 };
 
+const defaultShouldUpdate = () =>
+  true;
+
 /**
  * @param {Array|arguments} value
  * @param {Function} argProcessor
@@ -168,7 +171,18 @@ const parseProps = (
 
   const { key = prevKey } = props;
   const refId = addToRefId(path, key);
-  const skipValues = !props.empty ? 2 : 1;
+  const skipValues = !props.$$empty ? 2 : 1;
+  const currentConfig = getCurrentConfig(refId);
+  const { props: oProps } = currentConfig;
+  const {
+    shouldUpdate = defaultShouldUpdate,
+  } = props;
+
+  if (currentConfig !== noCurrentConfig
+      && !shouldUpdate(oProps, props)) {
+    return currentConfig;
+  }
+
   const args = prepareArgs(
     value, argProcessor, refId,
     ctor, onPathValue, skipValues,
@@ -179,9 +193,11 @@ const parseProps = (
       $$refId: refId,
       children: args,
     },
+    oProps: props,
     ctor,
   };
   transformConfig(baseConfig, props);
+
   return baseConfig;
 };
 
@@ -251,19 +267,25 @@ const processLisp = (
   }
 
   const f = getLispFunc(value);
-  const isDomComp = isType(
+  const isVnodeFn = isType(
     f, valueTypes.domComponent,
   );
   const nextCtor = prevCtor || f;
-  const argProcessor = isDomComp
+  const argProcessor = isVnodeFn
     // only eagerly process vnode functions
     ? processLisp : identity;
   const config = parseProps(
     value, argProcessor, path,
     prevKey, nextCtor, onPathValue,
   );
-  const fInput = isDomComp ? config : config.props;
+  const fInput = isVnodeFn ? config : config.props;
   const { props: { $$refId } } = config;
+  const currentConfig = getCurrentConfig($$refId);
+  const isMemoized = currentConfig === config;
+
+  if (isMemoized) {
+    return getTreeValue($$refId);
+  }
 
   /**
      * @important
@@ -283,7 +305,7 @@ const processLisp = (
     onPathValue,
   );
 
-  onPathValue($$refId, finalValue);
+  onPathValue($$refId, finalValue, config);
   return finalValue;
 };
 
@@ -388,6 +410,7 @@ const renderWith = (
     component, seedPath, onPathValue,
   );
 
+  onVtreeCompleted();
   return patch(fromNode, toNode);
 };
 
@@ -427,12 +450,24 @@ const CloneElement = ({ children: extendWith, $$refId }) => {
   return createVnode(sel, newConfig);
 };
 
+const Fragment = ({ children }) =>
+  children;
+
 export {
   defineElement,
   nativeElements,
   renderWith,
+  /**
+   * TODO
+   * Remove this method from the public api since we
+   * don't want it to be used directly. This way we
+   * can prevent the issue with vnodes being shared
+   * between two different components because snabbdom
+   * reuses vnodes internally for optimization purposes.
+   */
   createElement,
   CloneElement,
+  Fragment,
   valueTypes,
 };
 

@@ -4,7 +4,7 @@ import { getSupportedEventTypes } from '../../get-event-types';
 import { invalidComponentMsg } from './invalid-component-msg';
 import { string } from '../string';
 import { isArray, isFunc,
-  setValue, stringifyValueForLogging, isDef, exec } from '../utils';
+  setValue, stringifyValueForLogging, noop, exec } from '../utils';
 import { emptyArr } from '../constants';
 import {
   clearRenderContext,
@@ -24,16 +24,39 @@ const consumeHooksQueue = () => {
   return hooks;
 };
 
+const treePathsUsed = new Map();
+const checkDuplicateTreePath = (
+  refId, value, config,
+) => {
+  const inputs = { refId, value, config };
+
+  if (treePathsUsed.has(refId)) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `duplicate refId \`${refId}\` used\n`,
+      { old: treePathsUsed.get(refId),
+        new: inputs },
+    );
+  }
+  treePathsUsed.set(refId, inputs);
+};
+
 const treeValues = new Map();
 const getTreeValue = (refId) =>
   treeValues.get(refId);
-const setTreeValue = (refId, value) => {
+const setTreeValue = (refId, value, config) => {
+  if (process.env.NODE_ENV === 'development') {
+    checkDuplicateTreePath(refId, value, config);
+  }
   treeValues.set(refId, value);
 };
 const hasTreeValue = (refId) =>
   treeValues.has(refId);
 const deleteTreeValue = (refId) => {
   treeValues.delete(refId);
+};
+const onVtreeCompleted = () => {
+  treePathsUsed.clear();
 };
 
 const { isType } = valueTypes;
@@ -56,18 +79,7 @@ const handleProp = Object.freeze({
     domNode.setAttribute('data-ref-id', newId);
   },
 
-  key(oldKey, newKey, oldRef, newRef) {
-    if (process.env.NODE_ENV !== 'development') {
-      return;
-    }
-
-    if (!isDef(newKey)) {
-      return;
-    }
-
-    getDomNode(newRef)
-      .setAttribute('data-key', newRef.key);
-  },
+  key: noop,
 
   style(oldStyle = {}, newStyleObj, oldRef, ref) {
     const domNode = getDomNode(ref);
@@ -337,4 +349,5 @@ export {
   getTreeValue,
   hasTreeValue,
   setTreeValue,
+  onVtreeCompleted,
 };

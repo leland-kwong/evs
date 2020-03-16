@@ -9,7 +9,11 @@ import {
   pathSeparator,
 } from '../constants';
 import {
-  isArray, identity, isFunc, withDefault,
+  isArray,
+  identity,
+  isFunc,
+  withDefault,
+  alwaysTrue,
 } from '../utils';
 import * as valueTypes from './value-types';
 import {
@@ -101,7 +105,11 @@ const updateSourceValue = Object.assign;
  * of the root will not have latest changes.
  */
 const forceUpdate = (refId) => {
-  const { props: currentProps } = getCurrentConfig(refId);
+  const { props } = getCurrentConfig(refId);
+  const currentProps = {
+    ...props,
+    shouldUpdate: alwaysTrue,
+  };
   const dispatcher = getCurrentDispatcher(refId);
   const pathArray = refId.split(pathSeparator);
   const isVtreeRoot = pathArray.length === 1;
