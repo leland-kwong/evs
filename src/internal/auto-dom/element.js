@@ -414,42 +414,6 @@ const renderWith = (
   return patch(fromNode, toNode);
 };
 
-/**
- * Extends a component, by assigning new props
- * to the component.
- * New children will replace existing children.
- */
-const CloneElement = ({ children: extendWith, $$refId }) => {
-  const [baseComponent] = extendWith;
-  const baseConfig = getPropsFromArgs(baseComponent);
-  const [baseCtor] = baseComponent;
-  const config = getPropsFromArgs(extendWith);
-  const newChildren = !config.empty
-    ? extendWith.slice(2)
-    : extendWith.slice(1);
-  const baseVnode = createElement(
-    [baseCtor, baseConfig, ...newChildren],
-    $$refId,
-  );
-  const isTextNode = valueTypes
-    .isType(baseVnode, valueTypes.vnodeText);
-
-  if (isTextNode) {
-    return baseVnode;
-  }
-
-  const { sel, ctor } = baseVnode;
-  const { props: oProps } = baseVnode;
-  const props = {
-    ...oProps,
-    ...config,
-  };
-  const newConfig = { props, ctor };
-
-  transformConfig(newConfig, config);
-  return createVnode(sel, newConfig);
-};
-
 const Fragment = ({ children }) =>
   children;
 
@@ -466,7 +430,6 @@ export {
    * reuses vnodes internally for optimization purposes.
    */
   createElement,
-  CloneElement,
   Fragment,
   valueTypes,
 };
