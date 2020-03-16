@@ -6,10 +6,65 @@ import {
   renderWith,
   nativeElements,
   createElement,
+  Fragment,
 } from './prototype.ldom';
 import * as styles from './styles';
 import { TodoApp } from './todo-app';
-import { useModel, getAllModels } from '../src/internal/auto-dom';
+import {
+  useModel,
+} from '../src/internal/auto-dom';
+
+const propsToIgnoreForCheck = new Set([
+  // children are diff'd separately
+  'children',
+  'shouldUpdate',
+]);
+
+const shouldUpdate = (oldProps, newProps) => {
+  const { children: oldCh = [] } = oldProps;
+  const { children = [] } = newProps;
+
+  const hasNewChildren = children.length !== oldCh.length
+    || (children.length > 0 && children.find((v, i) =>
+      v !== oldCh[i]));
+  let hasChanges = hasNewChildren;
+
+  // eslint-disable-next-line no-restricted-syntax
+  for (const key in newProps) {
+    if (propsToIgnoreForCheck.has(key)) {
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+
+    if (hasChanges) {
+      break;
+    }
+
+    const hasChanged = oldProps[key]
+      !== newProps[key];
+    if (hasChanged) {
+      hasChanges = true;
+      break;
+    }
+  }
+
+  // eslint-disable-next-line no-console
+  console.log('hasChanges', hasChanges, oldProps, newProps);
+
+  return hasChanges;
+};
+
+// const TodoAppMemoized = (props) => {
+//   const {
+//     $$refId,
+//     ...inputProps
+//   } = props;
+
+//   return (
+//     [TodoApp,
+//       { ...inputProps, shouldUpdate }]
+//   );
+// };
 
 function benchFn(
   fn, arg, numTests,
@@ -32,9 +87,6 @@ function benchFn(
 }
 
 (() => {
-  const rootDom = document.createElement('div');
-  document.body.appendChild(rootDom);
-
   const A = nativeElements;
   const { swap, read } = atomicState;
 
@@ -124,18 +176,17 @@ function benchFn(
 
   const useModalModel = (
     refId,
+    modalName,
     initialState = { opened: true },
-  ) => {
-    console.log('refId', refId);
+  ) =>
+  // console.log('modal refId', refId);
 
-    return useModel(refId, 'Modal', initialState, {
+    useModel(refId, modalName, initialState, {
       shouldCleanup: () =>
         false,
     });
-  };
-
-  const setModalOpen = (refId, isOpened) => {
-    const model = useModalModel(refId);
+  const setModalOpen = (refId, modalName, isOpened) => {
+    const model = useModalModel(refId, modalName);
     swap(
       model,
       (state, opened = !state.opened) =>
@@ -145,14 +196,13 @@ function benchFn(
         }),
       isOpened,
     );
-    console.log(read(model));
   };
 
-  const Modal = ({ $$refId }) => {
-    const modalModel = useModalModel($$refId);
+  const Modal = ({ $$refId, name: modalName }) => {
+    const modalModel = useModalModel($$refId, modalName);
     const data = read(modalModel);
 
-    console.log('[modal render]', getAllModels($$refId));
+    // console.log('[modal render]', getAllModels($$refId));
 
     if (!data.opened) {
       return null;
@@ -160,19 +210,21 @@ function benchFn(
 
     return (
       [A.div,
-        [A.h2, 'Modal title'],
+        [A.h2, modalName],
         [A.div, 'Modal body']]
     );
   };
 
   const ModalToggleBtn = ({
     $$refId: refId,
+    modalName,
   }) =>
     ([A.button,
       { onClick() {
-        setModalOpen(refId);
+        setModalOpen(refId, modalName);
       } },
-      'Toggle modal']);
+      'Toggle modal: ',
+      [A.strong, modalName]]);
 
   const View = ({ $$refId }) => {
     const model = useModel($$refId, $$refId, defaultState);
@@ -239,13 +291,19 @@ function benchFn(
     );
 
     const conditionalTodoApp = (
-      data.name.length < 10
-        ? [TodoApp,
-          { key: 'TodoApp',
-            name: data.name },
-        ]
+      data.name.length < 100
+        ? [TodoApp, { shouldUpdate }]
         : [A.comment]
     );
+
+    const ModalExamples = () =>
+      ([A.div,
+        [Modal, { name: 'DefaultModal' }],
+        [Modal, { name: 'OtherModal' }],
+
+        [ModalToggleBtn, { modalName: 'DefaultModal' }],
+        [ModalToggleBtn, { modalName: 'OtherModal' }],
+      ]);
 
     return (
       [A.div,
@@ -255,13 +313,37 @@ function benchFn(
             padding: 1rem;
           ` },
         mainStyle,
-        conditionalTodoApp,
 
-        [A.div,
-          [Modal],
-          [ModalToggleBtn]],
+        [Fragment,
+          [A.div, 'foobar'],
+          [TodoApp,
+            { name: data.name,
+              shouldUpdate }]],
 
-        [TodoApp],
+        [ModalExamples],
+
+        /**
+         * FIXME
+         * Need to figure out a way to make $$refId non-enumerable
+         * so that it isn't included when doing a spread onto
+         * another component. Currently `forceUpdate` passes in the refId
+         * via props, which then gets copied over via `transformConfig`.
+         * Instead, we need to update the seedPath functionality to use
+         * that as the starting refId.
+         */
+
+        /**
+         * FIXME
+         * Fragments beyond the first must be values
+         * returned from a function component otherwise
+         * the refId will be incorrect. We should add a
+         * check to auto-convert each nested children array
+         * beyond the first into fragments.
+         */
+        [Fragment,
+          conditionalTodoApp,
+          [TodoApp, { shouldUpdate }],
+        ],
         [PerfTests],
         [Hello,
           { name: data.name,
@@ -275,5 +357,11 @@ function benchFn(
       ]);
   };
 
-  renderWith(rootDom, [View], '@Example');
+  const bootstrap = (seedPath) => {
+    const rootDom = document.createElement('div');
+    document.body.appendChild(rootDom);
+    renderWith(rootDom, [View], seedPath);
+  };
+
+  bootstrap('@Example-1');
 })();
