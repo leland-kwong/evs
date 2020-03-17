@@ -7,6 +7,7 @@ import {
 } from './vnode';
 import {
   pathSeparator,
+  specialProps,
 } from '../constants';
 import {
   isArray,
@@ -105,10 +106,13 @@ const updateSourceValue = Object.assign;
  * of the root will not have latest changes.
  */
 const forceUpdate = (refId) => {
-  const { props } = getCurrentConfig(refId);
+  const {
+    props: { $$refId, ...rest },
+  } = getCurrentConfig(refId);
   const currentProps = {
-    ...props,
-    shouldUpdate: alwaysTrue,
+    ...rest,
+    [specialProps.$$previousRefId]: $$refId,
+    [specialProps.shouldUpdate]: alwaysTrue,
   };
   const dispatcher = getCurrentDispatcher(refId);
   const pathArray = refId.split(pathSeparator);
@@ -163,7 +167,11 @@ const forceUpdate = (refId) => {
       ? ch.map(processChildren)
       : ch;
   };
-  const newChildren = oChildren.map(processChildren);
+  const newChildren = oChildren
+    .map(processChildren);
+  const {
+    props: { $$refId: parentRefId },
+  } = parentVnode;
   /**
    * Create the new parent vnode by copying it and
    * updating the original children props with the
@@ -188,10 +196,6 @@ const forceUpdate = (refId) => {
       children: newChildren,
     },
   });
-
-  const {
-    $$refId: parentRefId,
-  } = parentVnode.props;
 
   renderWith(
     parentVnode, nextParentVnode,

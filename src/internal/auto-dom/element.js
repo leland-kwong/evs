@@ -20,12 +20,14 @@ import {
   isDef,
   stringifyValueForLogging,
   identity,
+  alwaysTrue,
 } from '../utils';
 import {
   emptyArr,
   pathSeparator,
   nextPathKey,
   noCurrentConfig,
+  specialProps,
 } from '../constants';
 import * as valueTypes from './value-types';
 import {
@@ -111,18 +113,20 @@ const prepareArgs = (
   return args;
 };
 
-const emptyProps = {};
-Object.defineProperty(emptyProps, '$$empty', {
-  value: true,
-});
-Object.freeze(emptyProps);
+const emptyProps = Object.freeze(
+  Object.create({}, {
+    $$empty: {
+      value: true,
+    },
+  }),
+);
 
 /**
  * Mutates the source by applying transformations
  * and remapping as necessary
  */
-const transformConfig = (
-  config, props,
+const applyProps = (
+  configProps, props,
 ) => {
   const keys = Object.keys(props || emptyProps);
 
@@ -131,14 +135,16 @@ const transformConfig = (
     const k = keys[i];
     const v = props[k];
 
-    // transfer props onto config props
-    const p = config.props;
-    p[k] = v;
+    if (!specialProps[k]) {
+      // transfer props onto config props
+      const p = configProps;
+      p[k] = v;
+    }
 
     i += 1;
   }
 
-  return config;
+  return configProps;
 };
 
 const getPropsFromArgs = (value) => {
@@ -148,9 +154,6 @@ const getPropsFromArgs = (value) => {
 
   return hasProps ? firstArg : emptyProps;
 };
-
-const defaultShouldUpdate = () =>
-  true;
 
 /**
  * @param {Array|arguments} value
@@ -165,40 +168,40 @@ const parseProps = (
 
   /**
    * validate the original key since
-   * we use a default one later on
+   * we default to `prevKey` after
    */
   validateKey(props.key);
 
   const { key = prevKey } = props;
-  const refId = addToRefId(path, key);
-  const skipValues = !props.$$empty ? 2 : 1;
-  const currentConfig = getCurrentConfig(refId);
-  const { props: oProps } = currentConfig;
   const {
-    shouldUpdate = defaultShouldUpdate,
+    [specialProps.$$previousRefId]: previousRefId,
   } = props;
-
-  if (currentConfig !== noCurrentConfig
-      && !shouldUpdate(oProps, props)) {
-    return currentConfig;
-  }
-
+  const refId = isDef(previousRefId)
+    ? previousRefId
+    : addToRefId(path, key);
+  const skipValues = !props.$$empty ? 2 : 1;
   const args = prepareArgs(
     value, argProcessor, refId,
     ctor, onPathValue, skipValues,
   );
-  const baseConfig = {
-    props: {
-      key,
-      $$refId: refId,
+  const config = {
+    props: applyProps({
+      [specialProps.$$refId]: refId,
       children: args,
-    },
-    oProps: props,
+    }, props),
+    key: refId,
     ctor,
   };
-  transformConfig(baseConfig, props);
+  const currentConfig = getCurrentConfig(refId);
+  const { props: oProps } = currentConfig;
+  const { shouldUpdate = alwaysTrue } = props;
 
-  return baseConfig;
+  if (currentConfig !== noCurrentConfig
+      && !shouldUpdate(oProps, config.props)) {
+    return currentConfig;
+  }
+
+  return config;
 };
 
 const getLispFunc = (lisp) =>
@@ -279,7 +282,9 @@ const processLisp = (
     prevKey, nextCtor, onPathValue,
   );
   const fInput = isVnodeFn ? config : config.props;
-  const { props: { $$refId } } = config;
+  const {
+    props: { [specialProps.$$refId]: $$refId },
+  } = config;
   const currentConfig = getCurrentConfig($$refId);
   const isMemoized = currentConfig === config;
 

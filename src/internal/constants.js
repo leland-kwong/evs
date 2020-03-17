@@ -28,3 +28,14 @@ export const noCurrentConfig = Symbol(
 export const noCurrentDispatcher = Symbol(
   '@noCurrentDispatcher',
 );
+
+/**
+ * These do not get assigned to component props.
+ */
+export const specialProps = {
+  shouldUpdate: 'shouldUpdate',
+  key: 'key',
+
+  $$previousRefId: '$$previousRefId',
+  $$refId: '$$refId',
+};
