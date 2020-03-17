@@ -25,7 +25,6 @@ import {
 import {
   emptyArr,
   pathSeparator,
-  nextPathKey,
   noCurrentConfig,
   specialProps,
 } from '../constants';
@@ -45,7 +44,7 @@ const vnodeKeyTypes = {
 
 const newPath = Symbol('newPath');
 
-const keyRegex = /^[a-zA-Z0-9-_@/]*$/;
+const keyRegex = /^[a-zA-Z0-9-_/]*$/;
 
 const validateKey = (key, keyType = 'key') => {
   if (process.env.NODE_ENV !== 'development') {
@@ -193,10 +192,11 @@ const parseProps = (
     ctor,
   };
   const currentConfig = getCurrentConfig(refId);
+  const hasConfig = currentConfig !== noCurrentConfig;
   const { props: oProps } = currentConfig;
   const { shouldUpdate = alwaysTrue } = props;
 
-  if (currentConfig !== noCurrentConfig
+  if (hasConfig
       && !shouldUpdate(oProps, config.props)) {
     return currentConfig;
   }
@@ -244,6 +244,12 @@ const processLisp = (
 
   if (!isLispLike) {
     if (isList) {
+      /**
+       * @important
+       * we add to the refId here to ensure that
+       * collections are considered one level deeper
+       */
+      const nextPath = addToRefId(path, '@item');
       return value.map((v, defaultKey) => {
         /**
          * @important
@@ -252,7 +258,7 @@ const processLisp = (
          * still maintain their focus.
          */
         const result = processLisp(
-          v, path, defaultKey,
+          v, nextPath, defaultKey,
           prevCtor, onPathValue,
         );
         return result;
@@ -273,7 +279,7 @@ const processLisp = (
   const isVnodeFn = isType(
     f, valueTypes.domComponent,
   );
-  const nextCtor = prevCtor || f;
+  const nextCtor = f;
   const argProcessor = isVnodeFn
     // only eagerly process vnode functions
     ? processLisp : identity;
@@ -305,7 +311,7 @@ const processLisp = (
   const finalValue = processLisp(
     nextValue,
     $$refId,
-    nextPathKey,
+    '@fn',
     nextCtor,
     onPathValue,
   );
