@@ -9,6 +9,19 @@ const cl = {
     margin: 0;
     padding: 0;
     list-style: none;`,
+  itemStyle: (completed) =>
+    css`
+    ${cl.list}
+
+    input {
+      text-decoration: ${completed ? 'line-through' : null};
+    }
+    `,
+  sortBtn: (selected) =>
+    css`
+      background: ${selected ? '#3a88fd' : 'none'};
+      color: ${selected ? 'white' : 'none'};
+    `,
 };
 
 const uid = () =>
@@ -22,7 +35,7 @@ const initialModel = {
     text: '',
     completed: false,
   },
-  items: Array(2).fill(0)
+  items: Array(100).fill(0)
     .reduce((itemsByKey, _, index) => {
       const i = itemsByKey;
       const key = uid();
@@ -106,17 +119,10 @@ const transformItems = (items, sortBy) =>
 
 
 const Title = (
-  [A.h1, 'Todo App']);
+  [A.h2, 'Todo App']);
 
-const TodoItem = ({ key, value, onTodoChange }) => {
+const TodoItem = ({ id: key, value, onTodoChange }) => {
   const { text, completed } = value;
-  const itemStyle = css`
-    ${cl.list}
-
-    input {
-      text-decoration: ${completed ? 'line-through' : null};
-    }
-  `;
   const toggleCompleted = (e) => {
     const changes = { completed: e.target.checked };
     onTodoChange(
@@ -138,15 +144,14 @@ const TodoItem = ({ key, value, onTodoChange }) => {
                 onInput: changeText }]);
 
   return (
-    [A.li, { class: itemStyle },
+    [A.li,
+      { class: cl.itemStyle(completed) },
       completedField, ' ', textField]);
 };
 
 const TodoList = ({ items = [] }) =>
   ([A.ul,
-    { class: cl.list,
-      key: '@TodoList' },
-
+    { class: cl.list },
     items.map((props) =>
     // doing it this way adds the key to the props
       [TodoItem, props])]);
@@ -177,19 +182,25 @@ const SortOptions = ({ onSortChange, sortBy }) => {
     return (
       [A.button,
         { type: 'button',
-          class: css`
-            background: ${selected ? '#3a88fd' : 'none'};
-            color: ${selected ? 'white' : 'none'};
-          `,
+          class: cl.sortBtn(selected),
           onClick: () =>
             onSortChange({ direction }) },
         description]);
   };
+  const btn = {
+    sortAsc: [SortBtn, { direction: 'asc' }],
+    sortDesc: [SortBtn, { direction: 'desc' }],
+    sortToggle: (
+      [SortBtn,
+        { direction: sortBy === 'asc'
+          ? 'desc' : 'asc' }]),
+  };
 
   return (
     [A.div,
-      [SortBtn, { direction: 'asc' }],
-      [SortBtn, { direction: 'desc' }]]);
+      btn.sortAsc,
+      btn.sortDesc,
+      btn.sortToggle]);
 };
 
 
@@ -225,18 +236,29 @@ const useAsync = (() => {
   };
 })();
 
-const TodoMain = (props) => {
-  const { $$refId } = props;
-  const model = useModel(
-    $$refId, `${$$refId}--todos`, todosModel,
-  );
-  const { items = {}, newTodo, sortBy } = read(model);
+const AsyncExample = ({ $$refId }) => {
   const asyncData = useAsync($$refId, () =>
     new Promise((resolve) => {
-      setTimeout(resolve, 1000, Math.random());
+      setTimeout(resolve, 500, Math.random());
     }), {
     apiRoute: 'randomNum',
   });
+
+  return ([
+    [FragmentNode, 'async-fragment'],
+    [A.div,
+      'async data: ', [A.strong, asyncData]],
+    [FragmentNode, '/async-fragment'],
+  ]);
+};
+
+const TodoMain = ({ $$refId, name, children }) => {
+  console.log('[TodoMain render]', $$refId);
+
+  const model = useModel(
+    $$refId, $$refId, todosModel,
+  );
+  const { items = {}, newTodo, sortBy } = read(model);
 
   const onTodoChange = (payload) =>
     swap(model, updateTodo, payload);
@@ -250,9 +272,12 @@ const TodoMain = (props) => {
   return ([
     // A.div,
     [A.div,
-      'async data: ', [A.strong, asyncData]],
+      [A.h3, 'input children'],
+      children],
+
     [FragmentNode, 'fragment'],
 
+    [AsyncExample],
     [A.div,
       Title,
       [NewTodo, {
@@ -264,9 +289,9 @@ const TodoMain = (props) => {
       [TodoList,
         { items: transformItems(items, sortBy)
           .map(([key, value]) =>
-            ({ key, value, onTodoChange })) }],
+            ({ key, id: key, value, onTodoChange })) }],
     ],
-    [A.p, 'sibling: ', props.name],
+    [A.p, 'sibling: ', name],
 
     [FragmentNode, '/fragment'],
   ]);
