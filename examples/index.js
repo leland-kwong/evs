@@ -49,7 +49,7 @@ const shouldUpdate = (oldProps, newProps) => {
   }
 
   // eslint-disable-next-line no-console
-  console.log('hasChanges', hasChanges, oldProps, newProps);
+  // console.log('hasChanges', hasChanges, oldProps, newProps);
 
   return hasChanges;
 };
@@ -313,13 +313,6 @@ function benchFn(
             padding: 1rem;
           ` },
         mainStyle,
-
-        [Fragment,
-          [A.div, 'foobar'],
-          [TodoApp,
-            { name: data.name,
-              shouldUpdate }]],
-
         [ModalExamples],
 
         /**
@@ -342,7 +335,10 @@ function benchFn(
          */
         [Fragment,
           conditionalTodoApp,
-          [TodoApp, { shouldUpdate }],
+          [TodoApp,
+            {
+              // name: data.name,
+              shouldUpdate }],
         ],
         [PerfTests],
         [Hello,
