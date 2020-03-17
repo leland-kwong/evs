@@ -17,7 +17,6 @@ import {
 const propsToIgnoreForCheck = new Set([
   // children are diff'd separately
   'children',
-  'shouldUpdate',
 ]);
 
 const shouldUpdate = (oldProps, newProps) => {
@@ -25,8 +24,11 @@ const shouldUpdate = (oldProps, newProps) => {
   const { children = [] } = newProps;
 
   const hasNewChildren = children.length !== oldCh.length
-    || (children.length > 0 && children.find((v, i) =>
-      v !== oldCh[i]));
+    || Boolean(
+      children.length > 0
+        && children.find((v, i) =>
+          v !== oldCh[i]),
+    );
   let hasChanges = hasNewChildren;
 
   // eslint-disable-next-line no-restricted-syntax
@@ -34,10 +36,6 @@ const shouldUpdate = (oldProps, newProps) => {
     if (propsToIgnoreForCheck.has(key)) {
       // eslint-disable-next-line no-continue
       continue;
-    }
-
-    if (hasChanges) {
-      break;
     }
 
     const hasChanged = oldProps[key]
@@ -49,22 +47,15 @@ const shouldUpdate = (oldProps, newProps) => {
   }
 
   // eslint-disable-next-line no-console
-  // console.log('hasChanges', hasChanges, oldProps, newProps);
+  console.log('hasChanges', hasChanges, oldProps, newProps);
 
   return hasChanges;
 };
 
-// const TodoAppMemoized = (props) => {
-//   const {
-//     $$refId,
-//     ...inputProps
-//   } = props;
-
-//   return (
-//     [TodoApp,
-//       { ...inputProps, shouldUpdate }]
-//   );
-// };
+const TodoAppMemoized = (props) =>
+  ([TodoApp,
+    { ...props, shouldUpdate }]
+  );
 
 function benchFn(
   fn, arg, numTests,
@@ -292,7 +283,7 @@ function benchFn(
 
     const conditionalTodoApp = (
       data.name.length < 100
-        ? [TodoApp, { shouldUpdate }]
+        ? [TodoAppMemoized]
         : [A.comment]
     );
 
@@ -317,16 +308,6 @@ function benchFn(
 
         /**
          * FIXME
-         * Need to figure out a way to make $$refId non-enumerable
-         * so that it isn't included when doing a spread onto
-         * another component. Currently `forceUpdate` passes in the refId
-         * via props, which then gets copied over via `transformConfig`.
-         * Instead, we need to update the seedPath functionality to use
-         * that as the starting refId.
-         */
-
-        /**
-         * FIXME
          * Fragments beyond the first must be values
          * returned from a function component otherwise
          * the refId will be incorrect. We should add a
@@ -335,10 +316,9 @@ function benchFn(
          */
         [Fragment,
           conditionalTodoApp,
-          [TodoApp,
-            {
-              // name: data.name,
-              shouldUpdate }],
+          [TodoAppMemoized,
+            // { name: data.name }
+          ],
         ],
         [PerfTests],
         [Hello,
