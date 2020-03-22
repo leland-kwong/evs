@@ -299,11 +299,11 @@ const processLisp = (
   }
 
   /**
-     * @important
-     * this must be called before executing the
-     * dispatcher, so the code inside the dispatcher
-     * gets the right information.
-     */
+   * @important
+   * this must be called before executing the
+   * dispatcher, so the code inside the dispatcher
+   * gets the right information.
+   */
   setCurrentConfig($$refId, config);
   setCurrentDispatcher($$refId, f);
 
