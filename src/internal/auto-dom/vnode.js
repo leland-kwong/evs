@@ -239,9 +239,6 @@ const builtinHooks = {
       fn(this, refId, arg);
     },
   ),
-  postpatch(oldVnode, vnode) {
-    hookDebug('[postpatch]', oldVnode, vnode);
-  },
   destroy: exec(
     (hookCallback) =>
       (vnode) => {
@@ -289,7 +286,6 @@ const createVnode = (tagNameOrVnode, config) => {
     ? childArray.flat(Infinity)
     : childArray;
   const isComment = tagName === '!';
-
   const vnode = {
     sel: tagName,
     props,
@@ -303,9 +299,7 @@ const createVnode = (tagNameOrVnode, config) => {
     text: isComment
       ? text
       : undefined,
-    children: isComment
-      ? emptyArr
-      : flattenedChildren,
+    children: flattenedChildren,
     type: valueTypes.vnode,
     ctor,
   };

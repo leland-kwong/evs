@@ -33,8 +33,25 @@ const getCurrentDispatcher = (refId) =>
     ? currentDispatcher.get(refId)
     : noCurrentDispatcher);
 
-const setCurrentDispatcher = (refId, value) => {
-  currentDispatcher.set(refId, value);
+const dispatchErrorMsg = {
+  noAnonymous: (fn) =>
+    `
+You may not use anonymous functions for components. Received:
+
+${fn.toString()}
+  `,
+};
+
+const setCurrentDispatcher = (refId, fn) => {
+  if (process.env.NODE_ENV === 'development') {
+    if (!fn.name) {
+      throw new Error(
+        dispatchErrorMsg.noAnonymous(fn),
+      );
+    }
+  }
+
+  currentDispatcher.set(refId, fn);
 };
 
 const clearRenderContext = (refId) => {

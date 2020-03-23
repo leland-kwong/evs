@@ -77,6 +77,10 @@ const addToRefId = (currentPath, location) => {
     return location;
   }
 
+  if (!isDef(location)) {
+    return currentPath;
+  }
+
   return `${currentPath}${pathSeparator}${location}`;
 };
 
@@ -229,9 +233,10 @@ const processLisp = (
   }
 
   if (ignoredValues.has(value)) {
+    const key = addToRefId(path, prevKey);
     return createVnode('!',
-      { props: emptyProps,
-        children: String(value) });
+      { props: { text: `null__${key}` },
+        key });
   }
 
   const isList = isArray(value);
@@ -249,7 +254,6 @@ const processLisp = (
        * we add to the refId here to ensure that
        * collections are considered one level deeper
        */
-      const nextPath = addToRefId(path, '@item');
       return value.map((v, defaultKey) => {
         /**
          * @important
@@ -258,7 +262,7 @@ const processLisp = (
          * still maintain their focus.
          */
         const result = processLisp(
-          v, nextPath, defaultKey,
+          v, addToRefId(path, '@item'), defaultKey,
           prevCtor, onPathValue,
         );
         return result;
@@ -279,13 +283,15 @@ const processLisp = (
   const isVnodeFn = isType(
     f, valueTypes.domComponent,
   );
-  const nextCtor = f;
+  const nextCtor = !isVnodeFn ? f : prevCtor;
   const argProcessor = isVnodeFn
     // only eagerly process vnode functions
     ? processLisp : identity;
   const config = parseProps(
     value, argProcessor, path,
-    prevKey, nextCtor, onPathValue,
+    isDef(prevKey) ? `${nextCtor.name}-${prevKey}` : nextCtor.name,
+    nextCtor,
+    onPathValue,
   );
   const fInput = isVnodeFn ? config : config.props;
   const {
@@ -311,7 +317,7 @@ const processLisp = (
   const finalValue = processLisp(
     nextValue,
     $$refId,
-    '@fn',
+    undefined,
     nextCtor,
     onPathValue,
   );
@@ -425,8 +431,23 @@ const renderWith = (
   return patch(fromNode, toNode);
 };
 
+const FragmentRootNode = () =>
+  ([nativeElements.comment,
+    { text: 'FragmentRoot' },
+  ]);
+
 const Fragment = ({ children }) =>
-  children;
+  [
+  /**
+     * This is used as a stable *hook* node. We need this
+     * because currently hooks for fragment components are
+     * accumulated on the first vnode. This way, the fragment
+     * children can change but will not trigger an init/destroy
+     * hook event due to these changes.
+     */
+    [FragmentRootNode],
+    children,
+  ];
 
 export {
   defineElement,
