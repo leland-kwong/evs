@@ -13,6 +13,7 @@ import { TodoApp } from './todo-app';
 import {
   useModel,
 } from '../src/internal/auto-dom';
+import { enqueueHook } from '../src/internal/auto-dom/vnode';
 
 const propsToIgnoreForCheck = new Set([
   // children are diff'd separately
@@ -45,9 +46,6 @@ const shouldUpdate = (oldProps, newProps) => {
       break;
     }
   }
-
-  // eslint-disable-next-line no-console
-  console.log('hasChanges', hasChanges, oldProps, newProps);
 
   return hasChanges;
 };
@@ -193,7 +191,7 @@ function benchFn(
     const modalModel = useModalModel($$refId, modalName);
     const data = read(modalModel);
 
-    // console.log('[modal render]', getAllModels($$refId));
+    console.log('[modal render]', $$refId);
 
     if (!data.opened) {
       return null;
@@ -209,16 +207,92 @@ function benchFn(
   const ModalToggleBtn = ({
     $$refId: refId,
     modalName,
-  }) =>
-    ([A.button,
-      { onClick() {
-        setModalOpen(refId, modalName);
-      } },
-      'Toggle modal: ',
-      [A.strong, modalName]]);
+  }) => {
+    const modalModel = useModalModel(refId, modalName);
+    const { opened } = read(modalModel);
+
+    return (
+      [A.button,
+        { style: { display: 'block' },
+          onClick() {
+            setModalOpen(refId, modalName);
+          } },
+        'Toggle modal: ',
+        [A.strong, modalName],
+        [A.span, { style: { display: 'block' } },
+          'opened: ', [A.strong, String(opened)]]]);
+  };
+
+  const NullA = ({ $$refId }) => {
+    enqueueHook($$refId, (type) => {
+      console.log(type, $$refId);
+    });
+
+    return null;
+  };
+
+  const NullB = ({ $$refId }) => {
+    enqueueHook($$refId, (type) => {
+      console.log(type, $$refId);
+    });
+
+    return null;
+  };
+
+  const useRootModel = (refId) =>
+    useModel(refId, 'rootModel', defaultState,
+      { shouldCleanup: () =>
+        false });
+
+  const ModalExamples = ({ name }) =>
+    (
+      [A.div,
+        name.toLowerCase() === 'leland'
+          ? [Modal, { name: 'DefaultModal' }]
+          : null,
+        [Modal, { name: 'OtherModal' }],
+
+        [ModalToggleBtn, { modalName: 'DefaultModal' }],
+        [ModalToggleBtn, { modalName: 'OtherModal' }],
+      ]
+    );
+
+  const ToggleField = ({ checked, onToggle }) =>
+    ([A.label,
+      [A.input,
+        { type: 'checkbox',
+          checked,
+          onChange: (ev) => {
+            onToggle(ev.target.checked);
+          } }],
+      'toggle field']);
+
+  const MountDismountTest = ({ $$refId }) => {
+    const model = useModel($$refId, $$refId, { toggleState: false });
+    const state = read(model);
+
+    return (
+      [Fragment,
+        [state.toggleState ? NullA : NullB],
+
+        'checked: ',
+        String(state.toggleState),
+
+        [ToggleField,
+          { checked: state.toggleState,
+            onToggle(checked) {
+              swap(model, (s, toggleState) =>
+                ({
+                  ...s,
+                  toggleState,
+                }), checked);
+            } }],
+      ]
+    );
+  };
 
   const View = ({ $$refId }) => {
-    const model = useModel($$refId, $$refId, defaultState);
+    const model = useRootModel($$refId);
     const data = atomicState.read(model);
 
     const PerfTests = () => {
@@ -287,15 +361,6 @@ function benchFn(
         : [A.comment]
     );
 
-    const ModalExamples = () =>
-      ([A.div,
-        [Modal, { name: 'DefaultModal' }],
-        [Modal, { name: 'OtherModal' }],
-
-        [ModalToggleBtn, { modalName: 'DefaultModal' }],
-        [ModalToggleBtn, { modalName: 'OtherModal' }],
-      ]);
-
     return (
       [A.div,
         { class: css`
@@ -304,8 +369,8 @@ function benchFn(
             padding: 1rem;
           ` },
         mainStyle,
-        [ModalExamples],
-
+        [ModalExamples, { name: data.name }],
+        [MountDismountTest],
         /**
          * FIXME
          * Fragments beyond the first must be values
@@ -315,7 +380,7 @@ function benchFn(
          * beyond the first into fragments.
          */
         [Fragment,
-          conditionalTodoApp,
+          // conditionalTodoApp,
           [TodoAppMemoized,
             // { name: data.name }
           ],
@@ -339,5 +404,5 @@ function benchFn(
     renderWith(rootDom, [View], seedPath);
   };
 
-  bootstrap('@Example-1');
+  bootstrap('Example-1');
 })();

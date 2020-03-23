@@ -1,6 +1,6 @@
 import { css } from 'emotion';
 import * as atomicState from 'atomic-state';
-import { nativeElements as A } from '../src/internal/auto-dom/element';
+import { nativeElements as A, Fragment } from '../src/internal/auto-dom/element';
 import { useModel, hasModel } from '../src/internal/auto-dom';
 
 const { swap, read } = atomicState;
@@ -35,7 +35,7 @@ const initialModel = {
     text: '',
     completed: false,
   },
-  items: Array(100).fill(0)
+  items: Array(2).fill(0)
     .reduce((itemsByKey, _, index) => {
       const i = itemsByKey;
       const key = uid();
@@ -252,7 +252,7 @@ const AsyncExample = ({ $$refId }) => {
   ]);
 };
 
-const TodoMain = ({ $$refId, name, children }) => {
+const TodoMain = ({ $$refId, name }) => {
   console.log('[TodoMain render]', $$refId);
 
   const model = useModel(
@@ -269,14 +269,8 @@ const TodoMain = ({ $$refId, name, children }) => {
   const onSortChange = (payload) =>
     swap(model, changeSorting, payload);
 
-  return ([
-    // A.div,
-    [A.div,
-      [A.h3, 'input children'],
-      children],
-
-    [FragmentNode, 'fragment'],
-
+  return ([Fragment,
+    [A.hr],
     [AsyncExample],
     [A.div,
       Title,
@@ -292,8 +286,6 @@ const TodoMain = ({ $$refId, name, children }) => {
             ({ key, id: key, value, onTodoChange })) }],
     ],
     [A.p, 'sibling: ', name],
-
-    [FragmentNode, '/fragment'],
   ]);
 };
 
