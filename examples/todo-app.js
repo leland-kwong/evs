@@ -1,8 +1,10 @@
 import { css } from 'emotion';
 import * as atomicState from 'atomic-state';
-import { nativeElements as A, Fragment } from '../src/internal/auto-dom/element';
+import createDebug from 'debug';
+import { nativeElements as A } from '../src/internal/auto-dom/element';
 import { useModel, hasModel } from '../src/internal/auto-dom';
 
+const mainDebug = createDebug('TodoApp');
 const { swap, read } = atomicState;
 const cl = {
   list: css`
@@ -253,7 +255,7 @@ const AsyncExample = ({ $$refId }) => {
 };
 
 const TodoMain = ({ $$refId, name }) => {
-  console.log('[TodoMain render]', $$refId);
+  mainDebug('[Main render]', $$refId);
 
   const model = useModel(
     $$refId, $$refId, todosModel,
@@ -269,7 +271,7 @@ const TodoMain = ({ $$refId, name }) => {
   const onSortChange = (payload) =>
     swap(model, changeSorting, payload);
 
-  return ([Fragment,
+  return ([
     [A.hr],
     [AsyncExample],
     [A.div,

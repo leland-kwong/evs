@@ -6,7 +6,6 @@ import {
   renderWith,
   nativeElements,
   createElement,
-  Fragment,
 } from './prototype.ldom';
 import * as styles from './styles';
 import { TodoApp } from './todo-app';
@@ -191,10 +190,8 @@ function benchFn(
     const modalModel = useModalModel($$refId, modalName);
     const data = read(modalModel);
 
-    console.log('[modal render]', $$refId);
-
     if (!data.opened) {
-      return null;
+      return [null];
     }
 
     return (
@@ -245,17 +242,15 @@ function benchFn(
         false });
 
   const ModalExamples = ({ name }) =>
-    (
-      [A.div,
-        name.toLowerCase() === 'leland'
-          ? [Modal, { name: 'DefaultModal' }]
-          : null,
-        [Modal, { name: 'OtherModal' }],
+    ([
+      name.toLowerCase() === 'leland'
+        ? [Modal, { name: 'DefaultModal' }]
+        : null,
+      [Modal, { name: 'OtherModal' }],
 
-        [ModalToggleBtn, { modalName: 'DefaultModal' }],
-        [ModalToggleBtn, { modalName: 'OtherModal' }],
-      ]
-    );
+      [ModalToggleBtn, { modalName: 'DefaultModal' }],
+      [ModalToggleBtn, { modalName: 'OtherModal' }],
+    ]);
 
   const ToggleField = ({ checked, onToggle }) =>
     ([A.label,
@@ -271,24 +266,22 @@ function benchFn(
     const model = useModel($$refId, $$refId, { toggleState: false });
     const state = read(model);
 
-    return (
-      [Fragment,
-        [state.toggleState ? NullA : NullB],
+    return ([
+      [state.toggleState ? NullA : NullB],
 
-        'checked: ',
-        String(state.toggleState),
+      'checked: ',
+      String(state.toggleState),
 
-        [ToggleField,
-          { checked: state.toggleState,
-            onToggle(checked) {
-              swap(model, (s, toggleState) =>
-                ({
-                  ...s,
-                  toggleState,
-                }), checked);
-            } }],
-      ]
-    );
+      [ToggleField,
+        { checked: state.toggleState,
+          onToggle(checked) {
+            swap(model, (s, toggleState) =>
+              ({
+                ...s,
+                toggleState,
+              }), checked);
+          } }],
+    ]);
   };
 
   const View = ({ $$refId }) => {
@@ -356,10 +349,18 @@ function benchFn(
     );
 
     const conditionalTodoApp = (
-      data.name.length < 100
+      data.name.length < 10
         ? [TodoAppMemoized]
         : [A.comment]
     );
+
+    const MultipleTodoApps = () =>
+      ([
+        conditionalTodoApp,
+        [TodoAppMemoized,
+        // { name: data.name },
+        ],
+      ]);
 
     return (
       [A.div,
@@ -371,20 +372,10 @@ function benchFn(
         mainStyle,
         [ModalExamples, { name: data.name }],
         [MountDismountTest],
-        /**
-         * FIXME
-         * Fragments beyond the first must be values
-         * returned from a function component otherwise
-         * the refId will be incorrect. We should add a
-         * check to auto-convert each nested children array
-         * beyond the first into fragments.
-         */
-        [Fragment,
-          // conditionalTodoApp,
-          [TodoAppMemoized,
-            // { name: data.name }
-          ],
-        ],
+
+        [A.div, 'todo fragments'],
+        [MultipleTodoApps],
+
         [PerfTests],
         [Hello,
           { name: data.name,

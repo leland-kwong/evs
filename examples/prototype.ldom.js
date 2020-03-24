@@ -1,6 +1,5 @@
 import {
   nativeElements as A,
-  Fragment,
 } from '../src/internal/auto-dom/element';
 
 const NameInput = ({ name, onNameChange }) =>
@@ -34,11 +33,10 @@ const Divider = (
 );
 
 const Hello = ({ name, onNameChange }) =>
-  ([A.div,
+  ([
     Divider,
-    [Fragment,
-      numbers.map((v) =>
-        [A.span, v])],
+    numbers.map((v) =>
+      [A.span, v]),
     Divider,
     [Greeting, { name, onNameChange }],
   ]);
