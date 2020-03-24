@@ -13,8 +13,23 @@ import * as valueTypes from './value-types';
 
 const hookDebug = createDebug('vnode-hook');
 
+let isRendering = false;
+const treeValues = new Map();
+const treePathsUsed = new Map();
+
+const setIsRendering = (value) => {
+  isRendering = value;
+};
+
 let hooksQueue = [];
 const enqueueHook = (refId, callback, arg) => {
+  if (!isRendering) {
+    /**
+     * TODO
+     * add hook to first node
+     */
+    console.log('[enqueueHook async]', treeValues.get(refId));
+  }
   hooksQueue.push([refId, callback, arg]);
 };
 const consumeHooksQueue = () => {
@@ -24,7 +39,6 @@ const consumeHooksQueue = () => {
   return hooks;
 };
 
-const treePathsUsed = new Map();
 const checkDuplicateTreePath = (
   refId, value, config,
 ) => {
@@ -41,7 +55,6 @@ const checkDuplicateTreePath = (
   treePathsUsed.set(refId, inputs);
 };
 
-const treeValues = new Map();
 const getTreeValue = (refId) =>
   treeValues.get(refId);
 const setTreeValue = (refId, value, config) => {
@@ -255,6 +268,25 @@ const builtinHooks = {
   ),
 };
 
+const nullVnode = null;
+
+const normalizeChildren = (children) => {
+  if (!isArray(children)) {
+    return normalizeChildren([children]);
+  }
+
+  const isEmpty = children.length === 0;
+  if (isEmpty) {
+    return children;
+  }
+
+  const hasNestedChildren = children.find(isArray);
+
+  return hasNestedChildren
+    ? children.flat(Infinity)
+    : children;
+};
+
 const createVnode = (tagNameOrVnode, config) => {
   const isVnode = valueTypes.isType(
     tagNameOrVnode,
@@ -279,16 +311,11 @@ const createVnode = (tagNameOrVnode, config) => {
     $$refId,
     text,
   } = props;
-  const childArray = !isArray(children) ? [children] : children;
-  const hasNestedCollections = childArray.find(isArray);
-  const flattenedChildren = hasNestedCollections
-    ? childArray.flat(Infinity)
-    : childArray;
   const isComment = tagName === '!';
   const vnode = {
     sel: tagName,
     props,
-    customHooks: consumeHooksQueue(),
+    customHooks: [],
     key,
     refId: $$refId,
     data: {
@@ -298,7 +325,7 @@ const createVnode = (tagNameOrVnode, config) => {
     text: isComment
       ? text
       : undefined,
-    children: flattenedChildren,
+    children: normalizeChildren(children),
     type: valueTypes.vnode,
     ctor,
   };
@@ -307,15 +334,19 @@ const createVnode = (tagNameOrVnode, config) => {
 };
 
 export {
+  setIsRendering,
+
   createVnode,
   createTextVnode,
   ignoredValues,
   primitiveTypes,
+  nullVnode,
 
   getDomNode,
   validateVnodeValue,
 
   enqueueHook,
+  consumeHooksQueue,
 
   getTreeValue,
   hasTreeValue,

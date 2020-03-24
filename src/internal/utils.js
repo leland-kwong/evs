@@ -8,8 +8,23 @@ export const identity = (v) =>
 
 export const { isArray } = Array;
 
+const mutatedKeysPropKey = Symbol('@@mutated');
+
 export const setValue = (obj, key, value) => {
   const o = obj;
+
+  if (process.env.NODE_ENV === 'development') {
+    const {
+      [mutatedKeysPropKey]: mutatedProps,
+    } = o;
+
+    if (!mutatedProps) {
+      o[mutatedKeysPropKey] = new Set();
+      return setValue(obj, key, value);
+    }
+
+    mutatedProps.add(key);
+  }
 
   o[key] = value;
   return obj;

@@ -12,6 +12,9 @@ import {
   hasTreeValue,
   getTreeValue,
   onVtreeCompleted,
+  setIsRendering,
+  consumeHooksQueue,
+  nullVnode,
 } from './vnode';
 import { string } from '../string';
 import {
@@ -21,6 +24,7 @@ import {
   stringifyValueForLogging,
   identity,
   alwaysTrue,
+  setValue,
 } from '../utils';
 import {
   emptyArr,
@@ -275,14 +279,15 @@ const getLispFunc = (lisp) =>
   lisp[0];
 
 const toFragment = (value) => {
-  const alreadyFragment = value[0]
-    === fragmentRootNode;
+  const alreadyFragment = isArray(value)
+    ? value[0] === fragmentRootNode
+    : false;
 
   if (alreadyFragment) {
     return value;
   }
 
-  return [Fragment, value];
+  return [fragmentRootNode, value];
 };
 
 /**
@@ -307,11 +312,7 @@ const processLisp = (
   }
 
   if (ignoredValues.has(value)) {
-    const key = addToRefId(path, prevKey);
-
-    return createVnode('!',
-      { props: { text: `null__${key}` },
-        key });
+    return nullVnode;
   }
 
   const isList = isArray(value);
@@ -394,19 +395,22 @@ const processLisp = (
     return nextValue;
   }
 
+  /**
+   * consume hooks before continuing so we can apply them
+   * to the resulting hook node at the end
+   */
+  const hooks = consumeHooksQueue();
   // continue recursive process
-  const isFragmentLike = isArray(nextValue)
-    && !isFunc(nextValue[0]);
   const finalValue = processLisp(
-    isFragmentLike
-      // automatically wrap fragmentLike components
-      ? toFragment(nextValue) : nextValue,
+    toFragment(nextValue),
     $$refId,
     undefined,
     nextCtor,
     onPathValue,
   );
+  const hookNode = finalValue[0];
 
+  setValue(hookNode, 'customHooks', hooks);
   onPathValue($$refId, finalValue, config);
   return finalValue;
 };
@@ -465,11 +469,14 @@ const createElement = (
 const renderWith = (
   fromNode, element, seedPath,
 ) => {
+  setIsRendering(true);
+
   const toNode = createElement(
     element, seedPath, setTreeValue,
   );
   const vtree = patch(fromNode, toNode);
 
+  setIsRendering(false);
   onVtreeCompleted();
   setVtree(seedPath,
     { vtree, element, rootPath: seedPath });

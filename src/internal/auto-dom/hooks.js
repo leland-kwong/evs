@@ -1,3 +1,10 @@
+/**
+ * TODO
+ * Add dispatcher module that dispatches actions from child up to the parent
+ * by travelling up the node path. At each depth of the path we will look for
+ * an effect handler that matches that position and then trigger it.
+ */
+
 import { addWatch, removeWatch, atom } from 'atomic-state';
 import {
   enqueueHook,
@@ -47,10 +54,13 @@ const cleanupOnDestroy = (
 
   switch (type) {
   case 'destroy': {
-    const currentWatcher = model.watchersList
-      .get(refId);
-    const isWatcherReplaced = currentWatcher
-      !== watcherFn;
+    if (!model) {
+      console.error('[could not find model to cleanup]', { refId, key });
+      return;
+    }
+    const { watchersList } = model;
+    const w = watchersList.get(refId);
+    const isWatcherReplaced = w !== watcherFn;
 
     if (isWatcherReplaced) {
       return;
@@ -58,7 +68,9 @@ const cleanupOnDestroy = (
 
     removeWatch(model, refId);
 
-    if (shouldCleanup()) {
+    if (shouldCleanup()
+      && watchersList.size === 0
+    ) {
       scopedModels.delete(key);
     }
 
