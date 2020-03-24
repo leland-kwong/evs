@@ -11,43 +11,9 @@ import * as styles from './styles';
 import { TodoApp } from './todo-app';
 import {
   useModel,
+  shallowCompare as shouldUpdate,
 } from '../src/internal/auto-dom';
 import { enqueueHook } from '../src/internal/auto-dom/vnode';
-
-const propsToIgnoreForCheck = new Set([
-  // children are diff'd separately
-  'children',
-]);
-
-const shouldUpdate = (oldProps, newProps) => {
-  const { children: oldCh = [] } = oldProps;
-  const { children = [] } = newProps;
-
-  const hasNewChildren = children.length !== oldCh.length
-    || Boolean(
-      children.length > 0
-        && children.find((v, i) =>
-          v !== oldCh[i]),
-    );
-  let hasChanges = hasNewChildren;
-
-  // eslint-disable-next-line no-restricted-syntax
-  for (const key in newProps) {
-    if (propsToIgnoreForCheck.has(key)) {
-      // eslint-disable-next-line no-continue
-      continue;
-    }
-
-    const hasChanged = oldProps[key]
-      !== newProps[key];
-    if (hasChanged) {
-      hasChanges = true;
-      break;
-    }
-  }
-
-  return hasChanges;
-};
 
 const TodoAppMemoized = (props) =>
   ([TodoApp,
@@ -284,53 +250,56 @@ function benchFn(
     ]);
   };
 
-  const View = ({ $$refId }) => {
+  const PerfTests = ({ $$refId }) => {
     const model = useRootModel($$refId);
     const data = atomicState.read(model);
 
-    const PerfTests = () => {
-      const runBench = () => {
-        effects.BenchCreateElement(data.benchOptions);
-      };
-
-      const btnRunBench = (
-        [A.button,
-          { onClick: runBench },
-          'create vnodes',
-        ]);
-
-      const BenchOptionCtrl = ({ fieldName, state }) =>
-        (
-          [A.label, { style: { display: 'block' } },
-            fieldName,
-            [A.input, { type: 'number',
-                        value: state[fieldName],
-                        onChange: (ev) => {
-                          swap(model, rootReducer, {
-                            type: 'SetBenchOptions',
-                            options: {
-                              [fieldName]: Math.max(1,
-                                Number(ev.currentTarget.value)),
-                            },
-                          });
-                        } }]]);
-
-      const benchOptions = (
-        [A.div, { class: styles.Section },
-          [BenchOptionCtrl,
-            { fieldName: 'size', state: data.benchOptions }],
-          [BenchOptionCtrl,
-            { fieldName: 'numTests', state: data.benchOptions }]]
-      );
-
-      return (
-        [A.div,
-          [A.h2, 'Perf testing'],
-          btnRunBench,
-          benchOptions,
-        ]
-      );
+    const runBench = () => {
+      effects.BenchCreateElement(data.benchOptions);
     };
+
+    const btnRunBench = (
+      [A.button,
+        { onClick: runBench },
+        'create vnodes',
+      ]);
+
+    const BenchOptionCtrl = ({ fieldName, state }) =>
+      (
+        [A.label, { style: { display: 'block' } },
+          fieldName,
+          [A.input, { type: 'number',
+                      value: state[fieldName],
+                      onChange: (ev) => {
+                        swap(model, rootReducer, {
+                          type: 'SetBenchOptions',
+                          options: {
+                            [fieldName]: Math.max(1,
+                              Number(ev.currentTarget.value)),
+                          },
+                        });
+                      } }]]);
+
+    const benchOptions = (
+      [A.div, { class: styles.Section },
+        [BenchOptionCtrl,
+          { fieldName: 'size', state: data.benchOptions }],
+        [BenchOptionCtrl,
+          { fieldName: 'numTests', state: data.benchOptions }]]
+    );
+
+    return (
+      [A.div,
+        [A.h2, 'Perf testing'],
+        btnRunBench,
+        benchOptions,
+      ]
+    );
+  };
+
+  const View = ({ $$refId }) => {
+    const model = useRootModel($$refId);
+    const data = atomicState.read(model);
 
     const mainStyle = (
       [A.style,
@@ -376,7 +345,6 @@ function benchFn(
         [A.div, 'todo fragments'],
         [MultipleTodoApps],
 
-        [PerfTests],
         [Hello,
           { name: data.name,
             onNameChange(newName) {
@@ -391,8 +359,17 @@ function benchFn(
 
   const bootstrap = (seedPath) => {
     const rootDom = document.createElement('div');
+    const RootNode = A[rootDom.tagName.toLowerCase()];
+
     document.body.appendChild(rootDom);
-    renderWith(rootDom, [View], seedPath);
+    renderWith(
+      rootDom,
+      [RootNode,
+        [View],
+        [PerfTests],
+      ],
+      seedPath,
+    );
   };
 
   bootstrap('Example-1');

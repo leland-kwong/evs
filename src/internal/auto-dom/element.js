@@ -352,7 +352,8 @@ const processLisp = (
   const isVnodeFn = isType(
     f, valueTypes.domComponent,
   );
-  const nextCtor = !isVnodeFn ? f : prevCtor;
+  const nextCtor = !isVnodeFn
+    ? f : (prevCtor || f);
   const argProcessor = isVnodeFn
     // only eagerly process vnode functions
     ? processLisp : identity;

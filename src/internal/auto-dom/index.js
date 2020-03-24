@@ -4,3 +4,6 @@ export {
   hasModel,
   getAllModels,
 } from './hooks';
+export {
+  shallowCompare,
+} from './shallow-compare-props';
