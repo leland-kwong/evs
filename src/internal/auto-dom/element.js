@@ -74,6 +74,64 @@ const patch = snabbdomInit([
   snabbdomProps,
 ]);
 
+/**
+ * Generates a convenience method for element factories.
+ *
+ * ```js
+ * const div = defineElement('div')
+ * const span = defineElement('span')
+ *
+ * const MyComponent = () =>
+ *  ([div,
+ *    [span, 1, 2, 3]])
+ * ```
+ */
+const defineElement = (tagName) => {
+  function elementFactory(config) {
+    return createVnode(tagName, config);
+  }
+
+  const defineProps = Object.defineProperties;
+  return defineProps(elementFactory, {
+    name: {
+      value: tagName,
+    },
+    type: {
+      value: valueTypes.domComponent,
+    },
+  });
+};
+
+const nativeElements = Object.keys(elementTypes)
+  .reduce((elementFactories, tagName) => {
+    const e = elementFactories;
+
+    e[tagName] = defineElement(tagName);
+
+    return e;
+  }, {});
+
+// the `!` symbol is a comment in snabbdom
+nativeElements.comment = defineElement('!');
+
+const fragmentRootNode = (
+  [nativeElements.comment,
+    { text: 'FragmentRoot' },
+  ]);
+
+const Fragment = ({ children }) =>
+  [
+  /**
+     * This is used as a stable *hook* node. We need this
+     * because currently hooks for fragment components are
+     * accumulated on the first vnode. This way, the fragment
+     * children can change but will not trigger an init/destroy
+     * hook event due to these changes.
+     */
+    fragmentRootNode,
+    children,
+  ];
+
 const addToRefId = (currentPath, location) => {
   if (currentPath === newPath) {
     return location;
@@ -216,6 +274,17 @@ const parseProps = (
 const getLispFunc = (lisp) =>
   lisp[0];
 
+const toFragment = (value) => {
+  const alreadyFragment = value[0]
+    === fragmentRootNode;
+
+  if (alreadyFragment) {
+    return value;
+  }
+
+  return [Fragment, value];
+};
+
 /**
  * Recursively processes a tree of Arrays
  * as lisp data structures.
@@ -318,13 +387,19 @@ const processLisp = (
 
   const nextValue = f(fInput);
 
+  // we know its a vnode, so no more processing is necessary
   if (isVnodeFn) {
     onPathValue($$refId, nextValue, config);
     return nextValue;
   }
 
+  // continue recursive process
+  const isFragmentLike = isArray(nextValue)
+    && !isFunc(nextValue[0]);
   const finalValue = processLisp(
-    nextValue,
+    isFragmentLike
+      // automatically wrap fragmentLike components
+      ? toFragment(nextValue) : nextValue,
     $$refId,
     undefined,
     nextCtor,
@@ -381,46 +456,6 @@ const createElement = (
   return vtree;
 };
 
-/**
- * Generates a convenience method for element factories.
- *
- * ```js
- * const div = defineElement('div')
- * const span = defineElement('span')
- *
- * const MyComponent = () =>
- *  ([div,
- *    [span, 1, 2, 3]])
- * ```
- */
-const defineElement = (tagName) => {
-  function elementFactory(config) {
-    return createVnode(tagName, config);
-  }
-
-  const defineProps = Object.defineProperties;
-  return defineProps(elementFactory, {
-    name: {
-      value: tagName,
-    },
-    type: {
-      value: valueTypes.domComponent,
-    },
-  });
-};
-
-const nativeElements = Object.keys(elementTypes)
-  .reduce((elementFactories, tagName) => {
-    const e = elementFactories;
-
-    e[tagName] = defineElement(tagName);
-
-    return e;
-  }, {});
-
-// the `!` symbol is a comment in snabbdom
-nativeElements.comment = defineElement('!');
-
 /*
  * TODO:
  * Add support for rendering a fragment
@@ -438,24 +473,6 @@ const renderWith = (
   setVtree(seedPath, { vtree, element, rootPath: seedPath });
   return vtree;
 };
-
-const FragmentRootNode = () =>
-  ([nativeElements.comment,
-    { text: 'FragmentRoot' },
-  ]);
-
-const Fragment = ({ children }) =>
-  [
-  /**
-     * This is used as a stable *hook* node. We need this
-     * because currently hooks for fragment components are
-     * accumulated on the first vnode. This way, the fragment
-     * children can change but will not trigger an init/destroy
-     * hook event due to these changes.
-     */
-    [FragmentRootNode],
-    children,
-  ];
 
 export {
   defineElement,

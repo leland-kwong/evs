@@ -47,7 +47,6 @@ const cleanupOnDestroy = (
 
   switch (type) {
   case 'destroy': {
-    console.log('[cleanupOnDestroy]', refId);
     const currentWatcher = model.watchersList
       .get(refId);
     const isWatcherReplaced = currentWatcher
@@ -118,8 +117,6 @@ const useModel = (
   initialModel,
   options = defaultOptions,
 ) => {
-  console.log('[useModel]', refId, key);
-
   const im = initialModel;
   const scopedModels = getScopedModels(refId);
 
