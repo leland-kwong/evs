@@ -244,14 +244,13 @@ const builtinHooks = {
       (vnode) => {
         hookDebug('[destroy]', vnode);
         const { customHooks } = vnode;
-        const { $$refId: vnodeId } = vnode.props;
 
         customHooks.forEach(hookCallback);
-        deleteTreeValue(vnodeId);
-        clearRenderContext(vnodeId);
       },
     ([refId, fn, arg]) => {
       fn('destroy', refId, arg);
+      deleteTreeValue(refId);
+      clearRenderContext(refId);
     },
   ),
 };

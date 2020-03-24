@@ -33,7 +33,9 @@ import {
   getCurrentConfig,
   setCurrentConfig,
   setCurrentDispatcher,
+  getShouldUpdate,
 } from './render-context';
+import { setVtree } from './vtree-cache';
 
 const { isType } = valueTypes;
 
@@ -196,12 +198,15 @@ const parseProps = (
     ctor,
   };
   const currentConfig = getCurrentConfig(refId);
-  const hasConfig = currentConfig !== noCurrentConfig;
+  const hasConfig = currentConfig
+    !== noCurrentConfig;
   const { props: oProps } = currentConfig;
   const { shouldUpdate = alwaysTrue } = props;
+  const updatePredicate = getShouldUpdate()
+    || shouldUpdate;
 
   if (hasConfig
-      && !shouldUpdate(oProps, config.props)) {
+      && !updatePredicate(oProps, config.props)) {
     return currentConfig;
   }
 
@@ -234,6 +239,7 @@ const processLisp = (
 
   if (ignoredValues.has(value)) {
     const key = addToRefId(path, prevKey);
+
     return createVnode('!',
       { props: { text: `null__${key}` },
         key });
@@ -273,12 +279,6 @@ const processLisp = (
     return value;
   }
 
-  if (process.env.NODE_ENV === 'development') {
-    const v = value;
-    // add type annotation for dev purposes
-    v.type = valueTypes.fnComponent;
-  }
-
   const f = getLispFunc(value);
   const isVnodeFn = isType(
     f, valueTypes.domComponent,
@@ -287,11 +287,12 @@ const processLisp = (
   const argProcessor = isVnodeFn
     // only eagerly process vnode functions
     ? processLisp : identity;
+  const nextKey = isDef(prevKey)
+    ? `${prevKey}.${nextCtor.name}`
+    : nextCtor.name;
   const config = parseProps(
     value, argProcessor, path,
-    isDef(prevKey) ? `${nextCtor.name}-${prevKey}` : nextCtor.name,
-    nextCtor,
-    onPathValue,
+    nextKey, nextCtor, onPathValue,
   );
   const fInput = isVnodeFn ? config : config.props;
   const {
@@ -304,16 +305,24 @@ const processLisp = (
     return getTreeValue($$refId);
   }
 
-  /**
-   * @important
-   * this must be called before executing the
-   * dispatcher, so the code inside the dispatcher
-   * gets the right information.
-   */
-  setCurrentConfig($$refId, config);
-  setCurrentDispatcher($$refId, f);
+  if (!isVnodeFn) {
+    /**
+     * @important
+     * this must be called before executing the
+     * dispatcher, so the code inside the dispatcher
+     * gets the right information.
+     */
+    setCurrentConfig($$refId, config);
+    setCurrentDispatcher($$refId, f);
+  }
 
   const nextValue = f(fInput);
+
+  if (isVnodeFn) {
+    onPathValue($$refId, nextValue, config);
+    return nextValue;
+  }
+
   const finalValue = processLisp(
     nextValue,
     $$refId,
@@ -418,17 +427,16 @@ nativeElements.comment = defineElement('!');
  * so we don't require a single parent vnode.
  */
 const renderWith = (
-  fromNode,
-  component,
-  seedPath,
-  onPathValue = setTreeValue,
+  fromNode, element, seedPath,
 ) => {
   const toNode = createElement(
-    component, seedPath, onPathValue,
+    element, seedPath, setTreeValue,
   );
+  const vtree = patch(fromNode, toNode);
 
   onVtreeCompleted();
-  return patch(fromNode, toNode);
+  setVtree(seedPath, { vtree, element, rootPath: seedPath });
+  return vtree;
 };
 
 const FragmentRootNode = () =>

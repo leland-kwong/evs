@@ -1,30 +1,22 @@
 import { addWatch, removeWatch, atom } from 'atomic-state';
 import {
-  createVnode,
-  getTreeValue,
   enqueueHook,
-  setTreeValue,
 } from './vnode';
 import {
   pathSeparator,
-  specialProps,
 } from '../constants';
 import {
-  isArray,
-  identity,
   isFunc,
   withDefault,
-  alwaysTrue,
 } from '../utils';
-import * as valueTypes from './value-types';
 import {
   renderWith,
-  createElement,
 } from './element';
 import {
-  getCurrentConfig,
-  getCurrentDispatcher,
+  setShouldUpdate,
+  resetShouldUpdate,
 } from './render-context';
+import { getVtree } from './vtree-cache';
 
 const getPathRoot = (path) => {
   const sepIndex = path.indexOf(pathSeparator);
@@ -45,26 +37,6 @@ const setupScopedModels = (path) =>
     getPathRoot(path), new Map(),
   );
 
-const findParentVnode = (pathArray) => {
-  let pathIndex = pathArray.length;
-
-  while (pathIndex > 0) {
-    // walk up path tree until we find the nearest vnode
-    const path = pathArray.slice(0, pathIndex)
-      .join(pathSeparator);
-    const value = getTreeValue(path);
-    if (valueTypes.isType(
-      value,
-      valueTypes.vnode,
-    )) {
-      return value;
-    }
-    pathIndex -= 1;
-  }
-
-  return 'noParentVnodeFound';
-};
-
 const cleanupOnDestroy = (
   type,
   refId,
@@ -75,6 +47,7 @@ const cleanupOnDestroy = (
 
   switch (type) {
   case 'destroy': {
+    console.log('[cleanupOnDestroy]', refId);
     const currentWatcher = model.watchersList
       .get(refId);
     const isWatcherReplaced = currentWatcher
@@ -97,111 +70,34 @@ const cleanupOnDestroy = (
   }
 };
 
-const updateSourceValue = Object.assign;
-
 /**
  * @important
  * Any vnode that gets updated must also update
  * the original source value, otherwise the rerender
  * of the root will not have latest changes.
  */
-const forceUpdate = (refId) => {
-  const {
-    props: { $$refId, ...rest },
-  } = getCurrentConfig(refId);
-  const currentProps = {
-    ...rest,
-    [specialProps.$$previousRefId]: $$refId,
-    [specialProps.shouldUpdate]: alwaysTrue,
-  };
-  const dispatcher = getCurrentDispatcher(refId);
-  const pathArray = refId.split(pathSeparator);
-  const isVtreeRoot = pathArray.length === 1;
-  const currentValue = getTreeValue(refId);
-  /**
-   * We know its a fragment if the returned value
-   * is a collection of vnodes
-   */
-  const isFragment = isArray(currentValue);
+const forceUpdate = (componentRefId) => {
+  const { element, vtree, rootPath } = getVtree(componentRefId);
+  const refsUpdated = {};
+  const predicate = (_, newProps) => {
+    const { $$refId } = newProps;
+    const shouldUpdate = componentRefId.indexOf($$refId) === 0;
+    const isCurrentComponent = componentRefId === $$refId;
 
-  if (!isFragment) {
-    const onPathValue = isVtreeRoot ? setTreeValue : identity;
-    const nextValue = renderWith(
-      currentValue, [dispatcher, currentProps],
-      refId, onPathValue,
-    );
-
-    updateSourceValue(currentValue, nextValue);
-    return;
-  }
-
-  /**
-   * Rerender the fragment by rerendering the
-   * parent vnode and updating its children
-   * using the new fragment.
-   */
-  const parentVnode = findParentVnode(pathArray);
-  const { children: oChildren } = parentVnode.props;
-  const nextValue = createElement(
-    [dispatcher, currentProps],
-    refId,
-  );
-  /**
-   * Update the old fragment with the new value
-   */
-  const processChildren = (ch) => {
-    const isFragmentChild = isArray(ch);
-    const isCurrentFragment = isFragmentChild
-      && ch[0].refId === currentValue[0].refId;
-
-    if (isCurrentFragment) {
-      updateSourceValue(currentValue, nextValue);
-      return nextValue;
+    if (shouldUpdate) {
+      refsUpdated[$$refId] = (refsUpdated[$$refId] || 0) + 1;
     }
 
-    return isFragmentChild
-      /**
-       * recursively handle children for any
-       * nested fragments
-       */
-      ? ch.map(processChildren)
-      : ch;
-  };
-  const newChildren = oChildren
-    .map(processChildren);
-  const {
-    props: { $$refId: parentRefId },
-  } = parentVnode;
-  /**
-   * Create the new parent vnode by copying it and
-   * updating the original children props with the
-   * new children props.
-   */
-  const nextParentVnode = createVnode({
-    ...parentVnode,
-    props: {
-      ...parentVnode.props,
-      /**
-       * @important
-       * We must update the props in order to retain
-       * a proper historical copy of changes. Otherwise,
-       * if we modify the vnode's children directly, then
-       * the next render will not be accessing the latest
-       * children from the props. In other words, each
-       * update should have a new vnode where the props
-       * should be the representation of the change and
-       * `createVnode` will generate a new vnode based
-       * on the props.
-       */
-      children: newChildren,
-    },
-  });
+    // restore shouldUpdate to default behavior
+    if (isCurrentComponent) {
+      resetShouldUpdate();
+    }
 
-  renderWith(
-    parentVnode, nextParentVnode,
-    parentRefId, identity,
-  );
-  updateSourceValue(parentVnode, nextParentVnode);
+    return shouldUpdate;
+  };
+
+  setShouldUpdate(predicate);
+  renderWith(vtree, element, rootPath);
 };
 
 const initModel = (initialModel) =>
@@ -222,6 +118,8 @@ const useModel = (
   initialModel,
   options = defaultOptions,
 ) => {
+  console.log('[useModel]', refId, key);
+
   const im = initialModel;
   const scopedModels = getScopedModels(refId);
 

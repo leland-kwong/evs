@@ -8,8 +8,21 @@ import {
  * render process.
  */
 
+let shouldUpdate = null;
 const currentContext = new Map();
 const currentDispatcher = new Map();
+
+const setShouldUpdate = (fn) => {
+  shouldUpdate = fn;
+};
+
+const getShouldUpdate = () =>
+  shouldUpdate;
+
+const resetShouldUpdate = () => {
+  shouldUpdate = null;
+};
+
 
 /**
  * @returns {Object} current active props context
@@ -60,6 +73,10 @@ const clearRenderContext = (refId) => {
 };
 
 export {
+  setShouldUpdate,
+  getShouldUpdate,
+  resetShouldUpdate,
+
   getCurrentConfig,
   setCurrentConfig,
   getCurrentDispatcher,
