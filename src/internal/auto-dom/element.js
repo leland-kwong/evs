@@ -470,7 +470,8 @@ const renderWith = (
   const vtree = patch(fromNode, toNode);
 
   onVtreeCompleted();
-  setVtree(seedPath, { vtree, element, rootPath: seedPath });
+  setVtree(seedPath,
+    { vtree, element, rootPath: seedPath });
   return vtree;
 };
 
