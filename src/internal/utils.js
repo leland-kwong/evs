@@ -65,3 +65,10 @@ export const exec = (fn, arg) =>
 
 export const alwaysTrue = () =>
   true;
+
+export const last = (array) =>
+  array[array.length - 1];
+
+export const select = (fn, selector) =>
+  (...args) =>
+    fn(selector(...args));

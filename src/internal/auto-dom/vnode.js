@@ -21,23 +21,8 @@ const setIsRendering = (value) => {
   isRendering = value;
 };
 
-let hooksQueue = [];
-const enqueueHook = (refId, callback, arg) => {
-  if (!isRendering) {
-    /**
-     * TODO
-     * add hook to first node
-     */
-    console.log('[enqueueHook async]', treeValues.get(refId));
-  }
-  hooksQueue.push([refId, callback, arg]);
-};
-const consumeHooksQueue = () => {
-  const hooks = hooksQueue;
-
-  hooksQueue = [];
-  return hooks;
-};
+const getIsRendering = () =>
+  isRendering;
 
 const checkDuplicateTreePath = (
   refId, value, config,
@@ -335,6 +320,7 @@ const createVnode = (tagNameOrVnode, config) => {
 
 export {
   setIsRendering,
+  getIsRendering,
 
   createVnode,
   createTextVnode,
@@ -344,9 +330,6 @@ export {
 
   getDomNode,
   validateVnodeValue,
-
-  enqueueHook,
-  consumeHooksQueue,
 
   getTreeValue,
   hasTreeValue,

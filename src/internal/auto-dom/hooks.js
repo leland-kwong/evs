@@ -6,24 +6,25 @@
  */
 
 import { addWatch, removeWatch, atom } from 'atomic-state';
-import {
-  enqueueHook,
-} from './vnode';
+import createDebug from 'debug';
 import {
   pathSeparator,
 } from '../constants';
 import {
   isFunc,
   withDefault,
+  select,
 } from '../utils';
 import {
   renderWith,
+  enqueueHook,
 } from './element';
 import {
   setShouldUpdate,
   resetShouldUpdate,
 } from './render-context';
 import { getVtree } from './vtree-cache';
+import { inspectFn } from '../inspection/inspect-fn';
 
 const getPathRoot = (path) => {
   const sepIndex = path.indexOf(pathSeparator);
@@ -81,13 +82,7 @@ const cleanupOnDestroy = (
   }
 };
 
-/**
- * @important
- * Any vnode that gets updated must also update
- * the original source value, otherwise the rerender
- * of the root will not have latest changes.
- */
-const forceUpdate = (componentRefId) => {
+const forceUpdate = inspectFn((componentRefId) => {
   const { element, vtree, rootPath } = getVtree(componentRefId);
   const refsUpdated = {};
   const predicate = (_, newProps) => {
@@ -109,7 +104,12 @@ const forceUpdate = (componentRefId) => {
 
   setShouldUpdate(predicate);
   renderWith(vtree, element, rootPath);
-};
+},
+select(
+  createDebug('forceUpdate [perf]'),
+  ({ executionTimeMs }) =>
+    executionTimeMs,
+));
 
 const initModel = (initialModel) =>
   atom(
@@ -168,5 +168,4 @@ export {
   useModel,
   hasModel,
   getAllModels,
-  forceUpdate,
 };

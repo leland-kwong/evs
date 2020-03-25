@@ -2,8 +2,8 @@ import isPlainObject from 'is-plain-object';
 import { init as snabbdomInit } from 'snabbdom';
 import snabbdomProps from './snabbdom-modules/props';
 import { elementTypes } from '../element-types';
+import { defineElement } from '../define-element';
 import {
-  createVnode,
   createTextVnode,
   primitiveTypes,
   ignoredValues,
@@ -13,7 +13,7 @@ import {
   getTreeValue,
   onVtreeCompleted,
   setIsRendering,
-  consumeHooksQueue,
+  getIsRendering,
   nullVnode,
 } from './vnode';
 import { string } from '../string';
@@ -24,7 +24,6 @@ import {
   stringifyValueForLogging,
   identity,
   alwaysTrue,
-  setValue,
 } from '../utils';
 import {
   emptyArr,
@@ -40,6 +39,11 @@ import {
   getShouldUpdate,
 } from './render-context';
 import { setVtree } from './vtree-cache';
+import {
+  isFragmentRootNode,
+  Fragment,
+  getFragmentNodeFromFragment,
+} from '../fragment';
 
 const { isType } = valueTypes;
 
@@ -78,34 +82,6 @@ const patch = snabbdomInit([
   snabbdomProps,
 ]);
 
-/**
- * Generates a convenience method for element factories.
- *
- * ```js
- * const div = defineElement('div')
- * const span = defineElement('span')
- *
- * const MyComponent = () =>
- *  ([div,
- *    [span, 1, 2, 3]])
- * ```
- */
-const defineElement = (tagName) => {
-  function elementFactory(config) {
-    return createVnode(tagName, config);
-  }
-
-  const defineProps = Object.defineProperties;
-  return defineProps(elementFactory, {
-    name: {
-      value: tagName,
-    },
-    type: {
-      value: valueTypes.domComponent,
-    },
-  });
-};
-
 const nativeElements = Object.keys(elementTypes)
   .reduce((elementFactories, tagName) => {
     const e = elementFactories;
@@ -118,23 +94,37 @@ const nativeElements = Object.keys(elementTypes)
 // the `!` symbol is a comment in snabbdom
 nativeElements.comment = defineElement('!');
 
-const fragmentRootNode = (
-  [nativeElements.comment,
-    { text: 'FragmentRoot' },
-  ]);
+let hooksQueue = [];
 
-const Fragment = ({ children }) =>
-  [
-  /**
-     * This is used as a stable *hook* node. We need this
-     * because currently hooks for fragment components are
-     * accumulated on the first vnode. This way, the fragment
-     * children can change but will not trigger an init/destroy
-     * hook event due to these changes.
-     */
-    fragmentRootNode,
-    children,
-  ];
+const consumeHooksQueue = () => {
+  const hooks = hooksQueue;
+
+  hooksQueue = [];
+  return hooks;
+};
+
+const addHooks = (element, hooks) => {
+  const hookNode = getFragmentNodeFromFragment(element);
+
+  hookNode
+    .customHooks
+    .push(...hooks);
+
+  return element;
+};
+
+const enqueueHook = (refId, callback, arg) => {
+  hooksQueue.push([refId, callback, arg]);
+
+  const isAsyncHookAdd = !getIsRendering();
+
+  if (isAsyncHookAdd) {
+    addHooks(
+      getTreeValue(refId),
+      consumeHooksQueue(),
+    );
+  }
+};
 
 const addToRefId = (currentPath, location) => {
   if (currentPath === newPath) {
@@ -280,14 +270,16 @@ const getLispFunc = (lisp) =>
 
 const toFragment = (value) => {
   const alreadyFragment = isArray(value)
-    ? value[0] === fragmentRootNode
+    ? isFragmentRootNode(
+      getFragmentNodeFromFragment(value),
+    )
     : false;
 
   if (alreadyFragment) {
     return value;
   }
 
-  return [fragmentRootNode, value];
+  return [Fragment, value];
 };
 
 /**
@@ -402,15 +394,23 @@ const processLisp = (
   const hooks = consumeHooksQueue();
   // continue recursive process
   const finalValue = processLisp(
+    /**
+     * IMPORTANT
+     * By converting every function result to a fragment it
+     * provides us with a consistent hook node between renders.
+     * This is important because the function may return different
+     * dom structures between renders which would then cause the
+     * init/destroy hooks to be triggered due to the element switching,
+     * ie: (`div` to `span`).
+     */
     toFragment(nextValue),
     $$refId,
     undefined,
     nextCtor,
     onPathValue,
   );
-  const hookNode = finalValue[0];
 
-  setValue(hookNode, 'customHooks', hooks);
+  addHooks(finalValue, hooks);
   onPathValue($$refId, finalValue, config);
   return finalValue;
 };
@@ -496,8 +496,8 @@ export {
    * reuses vnodes internally for optimization purposes.
    */
   createElement,
-  Fragment,
   valueTypes,
+  enqueueHook,
 };
 
 export {
