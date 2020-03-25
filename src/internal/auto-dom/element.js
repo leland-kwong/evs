@@ -36,7 +36,6 @@ import * as valueTypes from './value-types';
 import {
   getCurrentConfig,
   setCurrentConfig,
-  setCurrentDispatcher,
   getShouldUpdate,
 } from './render-context';
 import { setVtree } from './vtree-cache';
@@ -242,24 +241,25 @@ const parseProps = (
     value, argProcessor, refId,
     ctor, onPathValue, skipValues,
   );
+  const { shouldUpdate = alwaysTrue } = props;
+  const updatePredicate = getShouldUpdate()
+    || shouldUpdate;
   const config = {
     props: applyProps({
       [specialProps.$$refId]: refId,
       children: args,
     }, props),
     key: refId,
+    originalShouldUpdate: shouldUpdate,
     ctor,
   };
   const currentConfig = getCurrentConfig(refId);
   const hasConfig = currentConfig
     !== noCurrentConfig;
   const { props: oProps } = currentConfig;
-  const { shouldUpdate = alwaysTrue } = props;
-  const updatePredicate = getShouldUpdate()
-    || shouldUpdate;
 
   if (hasConfig
-      && !updatePredicate(oProps, config.props)) {
+      && !updatePredicate(oProps, config.props, config)) {
     return currentConfig;
   }
 
@@ -369,20 +369,14 @@ const processLisp = (
   } = config;
   const currentConfig = getCurrentConfig($$refId);
   const isMemoized = currentConfig === config;
+  const shouldCacheContext = f !== Fragment;
 
   if (isMemoized) {
     return getTreeValue($$refId);
   }
 
-  if (!isVnodeFn) {
-    /**
-     * @important
-     * this must be called before executing the
-     * dispatcher, so the code inside the dispatcher
-     * gets the right information.
-     */
+  if (shouldCacheContext) {
     setCurrentConfig($$refId, config);
-    setCurrentDispatcher($$refId, f);
   }
 
   const nextValue = f(fInput);
@@ -509,7 +503,6 @@ export {
 
 export {
   getCurrentConfig,
-  getCurrentDispatcher,
 } from './render-context';
 
 export { getDomNode } from './vnode';

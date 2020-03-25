@@ -14,6 +14,7 @@ import {
   isFunc,
   withDefault,
   select,
+  alwaysTrue,
 } from '../utils';
 import {
   renderWith,
@@ -84,26 +85,35 @@ const cleanupOnDestroy = (
 
 const forceUpdate = inspectFn((componentRefId) => {
   const { element, vtree, rootPath } = getVtree(componentRefId);
-  const refsUpdated = {};
-  const predicate = (_, newProps) => {
+  let foundCurrentRef = false;
+  const predicate = (oldProps, newProps, newConfig) => {
     const { $$refId } = newProps;
-    const shouldUpdate = componentRefId.indexOf($$refId) === 0;
-    const isCurrentComponent = componentRefId === $$refId;
+    const isDescendant = foundCurrentRef
+      && $$refId.indexOf(componentRefId) === 0;
 
-    if (shouldUpdate) {
-      refsUpdated[$$refId] = (refsUpdated[$$refId] || 0) + 1;
+    if (isDescendant) {
+      const {
+        originalShouldUpdate: comparator,
+      } = newConfig;
+      return comparator(oldProps, newProps);
     }
 
-    // restore shouldUpdate to default behavior
-    if (isCurrentComponent) {
-      resetShouldUpdate();
+    const isCurrentRef = componentRefId === $$refId;
+    if (isCurrentRef) {
+      foundCurrentRef = true;
     }
 
-    return shouldUpdate;
+    const isWithinPath = componentRefId
+      .indexOf($$refId) === 0;
+
+    return isWithinPath;
   };
 
   setShouldUpdate(predicate);
   renderWith(vtree, element, rootPath);
+  resetShouldUpdate();
+
+  // console.log('[nodesUpdated]', nodesUpdated);
 },
 select(
   createDebug('forceUpdate [perf]'),
