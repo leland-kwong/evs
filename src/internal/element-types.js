@@ -1,6 +1,7 @@
 export const elementTypes = {
   aside: true,
   blockquote: true,
+  body: true,
   button: true,
   div: true,
   form: true,
