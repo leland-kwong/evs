@@ -1,4 +1,4 @@
 export const config = {
-  showRefId: true,
+  showRefId: false,
   showTreeValues: false,
 };

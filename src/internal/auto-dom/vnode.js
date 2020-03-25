@@ -9,7 +9,7 @@ import {
   clearRenderContext,
 } from './render-context';
 import * as valueTypes from './value-types';
-import { config as debugConfig } from '../debug';
+import { config as debugConfig } from '../debug.config';
 
 const hookDebug = createDebug('vnode-hook');
 
