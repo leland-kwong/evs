@@ -32,11 +32,14 @@ const Divider = (
                     background: '#000' } }]
 );
 
+const Number = ({ value }) =>
+  ([A.span, value]);
+
 const Hello = ({ name, onNameChange }) =>
   ([
     Divider,
-    numbers.map((v) =>
-      [A.span, v]),
+    numbers.map((value) =>
+      [Number, { value }]),
     Divider,
     [Greeting, { name, onNameChange }],
   ]);

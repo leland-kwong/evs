@@ -2,7 +2,11 @@ import { css } from 'emotion';
 import * as atomicState from 'atomic-state';
 import createDebug from 'debug';
 import { nativeElements as A } from '../src/internal/auto-dom/element';
-import { useModel, hasModel } from '../src/internal/auto-dom';
+import {
+  useModel,
+  hasModel,
+  shallowCompare,
+} from '../src/internal/auto-dom';
 
 const mainDebug = createDebug('TodoApp');
 const { swap, read } = atomicState;
@@ -32,12 +36,14 @@ const uid = () =>
 const inputValue = (e) =>
   e.target.value;
 
-const initialModel = {
+const initialItemCount = 50;
+
+const initialModel = ({
   newTodo: {
     text: '',
     completed: false,
   },
-  items: Array(2).fill(0)
+  items: Array(initialItemCount).fill(0)
     .reduce((itemsByKey, _, index) => {
       const i = itemsByKey;
       const key = uid();
@@ -50,7 +56,7 @@ const initialModel = {
       return i;
     }, {}),
   sortBy: 'asc',
-};
+});
 
 const todosModel = () =>
   initialModel;
@@ -123,7 +129,9 @@ const transformItems = (items, sortBy) =>
 const Title = (
   [A.h2, 'Todo App']);
 
-const TodoItem = ({ id: key, value, onTodoChange }) => {
+const TodoItem = ({ id: key, value, model }) => {
+  const onTodoChange = (payload) =>
+    swap(model, updateTodo, payload);
   const { text, completed } = value;
   const toggleCompleted = (e) => {
     const changes = { completed: e.target.checked };
@@ -151,12 +159,30 @@ const TodoItem = ({ id: key, value, onTodoChange }) => {
       completedField, ' ', textField]);
 };
 
-const TodoList = ({ items = [] }) =>
-  ([A.ul,
-    { class: cl.list },
-    items.map((props) =>
-    // doing it this way adds the key to the props
-      [TodoItem, props])]);
+const rootPath = (refId) => {
+  const rootFnName = 'TodoMain';
+  const endIndex = refId.lastIndexOf(rootFnName)
+    + rootFnName.length;
+
+  return refId.slice(0, endIndex);
+};
+
+const useTodoModel = (refId) =>
+  useModel(refId, rootPath(refId), todosModel);
+
+const TodoList = ({ items = [], $$refId }) => {
+  const rootModel = useTodoModel($$refId);
+
+  return (
+    [A.ul,
+      { class: cl.list },
+      items.map((props) =>
+        ([TodoItem,
+          { ...props,
+            model: rootModel,
+            shouldUpdate: shallowCompare }])),
+    ]);
+};
 
 const NewTodo = ({ onNewTodoCreate, onNewTodoChange, newTodo }) => {
   const newTodoField = (
@@ -257,13 +283,9 @@ const AsyncExample = ({ $$refId }) => {
 const TodoMain = ({ $$refId, name }) => {
   mainDebug('[Main render]', $$refId);
 
-  const model = useModel(
-    $$refId, $$refId, todosModel,
-  );
+  const model = useTodoModel($$refId);
   const { items = {}, newTodo, sortBy } = read(model);
 
-  const onTodoChange = (payload) =>
-    swap(model, updateTodo, payload);
   const onNewTodoCreate = (payload) =>
     swap(model, addTodo, payload);
   const onNewTodoChange = (payload) =>
@@ -274,19 +296,17 @@ const TodoMain = ({ $$refId, name }) => {
   return ([
     [A.hr],
     [AsyncExample],
-    [A.div,
-      Title,
-      [NewTodo, {
-        onNewTodoCreate,
-        onNewTodoChange,
-        newTodo,
-      }],
-      [SortOptions, { onSortChange, sortBy }],
-      [TodoList,
-        { items: transformItems(items, sortBy)
-          .map(([key, value]) =>
-            ({ key, id: key, value, onTodoChange })) }],
-    ],
+    Title,
+    [NewTodo, {
+      onNewTodoCreate,
+      onNewTodoChange,
+      newTodo,
+    }],
+    [SortOptions, { onSortChange, sortBy }],
+    [TodoList,
+      { items: transformItems(items, sortBy)
+        .map(([key, value]) =>
+          ({ key, id: key, value })) }],
     [A.p, 'sibling: ', name],
   ]);
 };
