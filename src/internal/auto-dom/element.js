@@ -185,7 +185,7 @@ const emptyProps = Object.freeze(
 const applyProps = (
   configProps, props,
 ) => {
-  const keys = Object.keys(props || emptyProps);
+  const keys = Object.keys(props);
 
   let i = 0;
   while (i < keys.length) {
@@ -297,16 +297,6 @@ const processLisp = (
   value, path, prevKey,
   prevCtor, onPathValue,
 ) => {
-  const $type = typeof value;
-
-  if (primitiveTypes.has($type)) {
-    return createTextVnode(value);
-  }
-
-  if (ignoredValues.has(value)) {
-    return nullVnode;
-  }
-
   const isList = isArray(value);
   /**
    * lisp structure is:
@@ -335,6 +325,15 @@ const processLisp = (
         );
         return result;
       });
+    }
+
+    if (ignoredValues.has(value)) {
+      return nullVnode;
+    }
+
+    const $type = typeof value;
+    if (primitiveTypes.has($type)) {
+      return createTextVnode(value);
     }
 
     validateVnodeValue(value);

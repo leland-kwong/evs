@@ -1,7 +1,6 @@
 import { outdent } from 'outdent';
 import createDebug from 'debug';
 import { getSupportedEventTypes } from '../../get-event-types';
-import { invalidComponentMsg } from './invalid-component-msg';
 import { string } from '../string';
 import { isArray, isFunc,
   setValue, stringifyValueForLogging, noop, exec } from '../utils';
@@ -150,8 +149,7 @@ const validateVnodeValue = (value) => {
   }
 
   const isObjectChild = typeof value === 'object'
-    && !isType(value, valueTypes.vnode)
-    && !isType(value, valueTypes.vnodeText);
+    && !isType(value, valueTypes.vnode);
 
   if (isObjectChild) {
     const stringified = stringifyValueForLogging(value);
@@ -164,22 +162,13 @@ const validateVnodeValue = (value) => {
     ]));
   }
 
-  // children should not be nested arrays
-  const isNestedCollection = isArray(value);
-
-  if (isNestedCollection) {
-    throw new Error(
-      invalidComponentMsg(value),
-    );
-  }
-
   return value;
 };
 
 function createTextVnode(value) {
   return {
     text: value,
-    type: valueTypes.vnodeText,
+    type: valueTypes.vnode,
   };
 }
 
@@ -257,12 +246,7 @@ const nullVnode = null;
 
 const normalizeChildren = (children) => {
   if (!isArray(children)) {
-    return normalizeChildren([children]);
-  }
-
-  const isEmpty = children.length === 0;
-  if (isEmpty) {
-    return children;
+    return [children];
   }
 
   const hasNestedChildren = children.find(isArray);

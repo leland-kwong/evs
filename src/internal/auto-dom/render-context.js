@@ -29,9 +29,8 @@ const resetShouldUpdate = () => {
  * that is being rendered with.
  */
 const getCurrentConfig = (refId) =>
-  (currentContext.has(refId)
-    ? currentContext.get(refId)
-    : noCurrentConfig);
+  currentContext.get(refId)
+    || noCurrentConfig;
 
 const setCurrentConfig = (refId, value) => {
   currentContext.set(refId, value);
