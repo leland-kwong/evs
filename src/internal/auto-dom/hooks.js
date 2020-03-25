@@ -112,8 +112,6 @@ const forceUpdate = inspectFn((componentRefId) => {
   setShouldUpdate(predicate);
   renderWith(vtree, element, rootPath);
   resetShouldUpdate();
-
-  // console.log('[nodesUpdated]', nodesUpdated);
 },
 select(
   createDebug('forceUpdate [perf]'),
