@@ -34,6 +34,5 @@ export const specialProps = {
   shouldUpdate: 'shouldUpdate',
   key: 'key',
 
-  $$previousRefId: '$$previousRefId',
   $$refId: '$$refId',
 };

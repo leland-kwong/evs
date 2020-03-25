@@ -230,12 +230,7 @@ const parseProps = (
   validateKey(props.key);
 
   const { key = prevKey } = props;
-  const {
-    [specialProps.$$previousRefId]: previousRefId,
-  } = props;
-  const refId = isDef(previousRefId)
-    ? previousRefId
-    : addToRefId(path, key);
+  const refId = addToRefId(path, key);
   const skipValues = !props.$$empty ? 2 : 1;
   const args = prepareArgs(
     value, argProcessor, refId,
