@@ -19,10 +19,13 @@ function updateProps(hook, oldVnode, vnode) {
   } = oldVnode;
   const { props = emptyObj } = vnode;
   const { handleProp } = vnode.data;
+  const { wildCard } = handleProp;
 
   if (domNodeTypes.comment === elm.nodeType) {
     return;
   }
+
+  wildCard(oldProps, props, oldVnode, vnode);
 
   for (const key in props) {
     const prev = oldProps[key];

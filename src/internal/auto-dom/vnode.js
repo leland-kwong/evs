@@ -9,6 +9,7 @@ import {
   clearRenderContext,
 } from './render-context';
 import * as valueTypes from './value-types';
+import { config as debugConfig } from '../debug';
 
 const hookDebug = createDebug('vnode-hook');
 
@@ -53,7 +54,9 @@ const deleteTreeValue = (refId) => {
   treeValues.delete(refId);
 };
 const onVtreeCompleted = () => {
-  console.log(treeValues);
+  if (debugConfig.showTreeValues) {
+    console.log(treeValues);
+  }
   treePathsUsed.clear();
 };
 
@@ -72,17 +75,23 @@ const remappedEventTypes = {
   focusout: 'blur',
 };
 
+const reflectRefIdToAttr = (oldProps, newProps, oldRef, newRef) => {
+  const type = debugConfig.showRefId ? 'set' : 'remove';
+  const { $$refId: newId } = newProps;
+  const domNode = getDomNode(newRef);
+
+  domNode[`${type}Attribute`]('data-ref-id', newId);
+};
+
 const handleProp = Object.freeze({
+  wildCard(oldProps, newProps, oldRef, newRef) {
+    if (process.env.NODE_ENV === 'development') {
+      reflectRefIdToAttr(oldProps, newProps, oldRef, newRef);
+    }
+  },
   // do nothing here because we want to
   // exclude it from being applied to the dom
-  children() {},
-
-  $$refId(oldId, newId, oldRef, newRef) {
-    const domNode = getDomNode(newRef);
-    domNode.setAttribute('data-ref-id', newId);
-  },
-
-  key: noop,
+  children: noop,
 
   style(oldStyle = {}, newStyleObj, oldRef, ref) {
     const domNode = getDomNode(ref);
