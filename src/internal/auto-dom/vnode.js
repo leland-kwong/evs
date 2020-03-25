@@ -4,7 +4,7 @@ import { getSupportedEventTypes } from '../../get-event-types';
 import { string } from '../string';
 import { isArray, isFunc,
   setValue, stringifyValueForLogging, noop, exec } from '../utils';
-import { emptyArr } from '../constants';
+import { emptyArr, specialProps } from '../constants';
 import {
   clearRenderContext,
 } from './render-context';
@@ -53,7 +53,13 @@ const deleteTreeValue = (refId) => {
   treeValues.delete(refId);
 };
 const onVtreeCompleted = () => {
+  console.log(treeValues);
   treePathsUsed.clear();
+};
+
+const cleanTreePosition = (refId) => {
+  deleteTreeValue(refId);
+  clearRenderContext(refId);
 };
 
 const { isType } = valueTypes;
@@ -233,11 +239,12 @@ const builtinHooks = {
         const { customHooks } = vnode;
 
         customHooks.forEach(hookCallback);
+        const { refId } = vnode;
+        cleanTreePosition(refId);
       },
     ([refId, fn, arg]) => {
       fn('destroy', refId, arg);
-      deleteTreeValue(refId);
-      clearRenderContext(refId);
+      cleanTreePosition(refId);
     },
   ),
 };
@@ -277,7 +284,7 @@ const createVnode = (tagNameOrVnode, config) => {
   } = config;
   const {
     children = emptyArr,
-    $$refId,
+    [specialProps.$$refId]: $$refId,
     text,
   } = props;
   const isComment = tagName === '!';
@@ -318,5 +325,6 @@ export {
   getTreeValue,
   hasTreeValue,
   setTreeValue,
+  cleanTreePosition,
   onVtreeCompleted,
 };

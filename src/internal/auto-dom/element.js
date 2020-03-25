@@ -15,6 +15,7 @@ import {
   setIsRendering,
   getIsRendering,
   nullVnode,
+  cleanTreePosition,
 } from './vnode';
 import { string } from '../string';
 import {
@@ -282,6 +283,12 @@ const toFragment = (value) => {
   return [Fragment, value];
 };
 
+const cleanupOnDestroy = (type, refId) => {
+  if (type === 'destroy') {
+    cleanTreePosition(refId);
+  }
+};
+
 /**
  * Recursively processes a tree of Arrays
  * as lisp data structures.
@@ -409,8 +416,9 @@ const processLisp = (
     onPathValue,
   );
 
-  addHooks(finalValue, hooks);
   onPathValue($$refId, finalValue, config);
+  enqueueHook($$refId, cleanupOnDestroy);
+  addHooks(finalValue, hooks);
   return finalValue;
 };
 
@@ -439,7 +447,7 @@ const validateSeedPath = (seedPath) => {
 const createElement = (
   value,
   seedPath,
-  onPathValue = identity,
+  onPathValue = setTreeValue,
 ) => {
   if (process.env.NODE_ENV === 'development') {
     validateSeedPath(seedPath);
@@ -456,6 +464,7 @@ const createElement = (
     undefined,
     onPathValue,
   );
+  onVtreeCompleted();
 
   return vtree;
 };
@@ -476,7 +485,6 @@ const renderWith = (
   const vtree = patch(fromNode, toNode);
 
   setIsRendering(false);
-  onVtreeCompleted();
   setVtree(seedPath,
     { vtree, element, rootPath: seedPath });
   return vtree;

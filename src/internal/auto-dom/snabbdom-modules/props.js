@@ -44,8 +44,8 @@ function updateProps(hook, oldVnode, vnode) {
     }
   }
 
-  const { $$refId: id1 } = oldVnode;
-  const { $$refId: id2 } = vnode;
+  const { refId: id1 } = oldVnode;
+  const { refId: id2 } = vnode;
   const isNewReference = id1 !== id2;
 
   /** TODO: naive implementation, needs testing */
