@@ -3,7 +3,6 @@ import * as atomicState from 'atomic-state';
 import { nativeElements as A } from '../src/internal/auto-dom/element';
 import {
   useModel,
-  hasModel,
   shallowCompare,
 } from '../src/internal/auto-dom';
 
@@ -230,55 +229,6 @@ const SortOptions = ({ onSortChange, sortBy }) => {
       btn.sortToggle]);
 };
 
-
-const FragmentNode = ({ children }) =>
-  ([A.comment, { text: children }]);
-
-const noAsyncData = 'noAsyncData';
-
-const useAsync = (() => {
-  const modelMeta = {
-    shouldCleanup: () =>
-      false,
-  };
-
-  return (refId, fetchData, fetchOptions) => {
-    const { apiRoute = '' } = fetchOptions;
-    const isNew = !hasModel(refId, apiRoute);
-    const model = useModel(
-      refId, apiRoute, noAsyncData, modelMeta,
-    );
-    const data = read(model);
-
-    if (isNew) {
-      console.log('[new fetch]', apiRoute);
-      const asyncValue = fetchData(fetchOptions);
-      asyncValue.then((v) => {
-        swap(model, () =>
-          v);
-      });
-    }
-
-    return data;
-  };
-})();
-
-const AsyncExample = ({ $$refId }) => {
-  const asyncData = useAsync($$refId, () =>
-    new Promise((resolve) => {
-      setTimeout(resolve, 500, Math.random());
-    }), {
-    apiRoute: 'randomNum',
-  });
-
-  return ([
-    [FragmentNode, 'async-fragment'],
-    [A.div,
-      'async data: ', [A.strong, asyncData]],
-    [FragmentNode, '/async-fragment'],
-  ]);
-};
-
 const TodoMain = ({ $$refId, name }) => {
   const model = useTodoModel($$refId);
   const { items = {}, newTodo, sortBy } = read(model);
@@ -292,7 +242,6 @@ const TodoMain = ({ $$refId, name }) => {
 
   return ([
     [A.hr],
-    [AsyncExample],
     Title,
     [NewTodo, {
       onNewTodoCreate,

@@ -12,7 +12,6 @@ import {
 } from '../constants';
 import {
   isFunc,
-  withDefault,
   select,
 } from '../utils';
 import {
@@ -193,7 +192,6 @@ const transmit = (refId, message) => {
 
 export {
   useModel,
-  hasModel,
   getAllModels,
   useReceiver,
   transmit,
