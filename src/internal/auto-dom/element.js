@@ -507,14 +507,15 @@ const renderWith = (
 ) => {
   setIsRendering(true);
 
-  const toNode = createElement(
+  const vtree = createElement(
     element, seedPath, setTreeValue,
   );
-  const vtree = patch(fromNode, toNode);
 
-  setIsRendering(false);
   setVtree(seedPath,
     { vtree, element, rootPath: seedPath });
+  patch(fromNode, vtree);
+  setIsRendering(false);
+
   return vtree;
 };
 
