@@ -9,7 +9,6 @@ import {
 
 let shouldUpdate = null;
 const currentContext = new Map();
-const currentDispatcher = new Map();
 
 const setShouldUpdate = (fn) => {
   shouldUpdate = fn;
@@ -37,7 +36,6 @@ const setCurrentConfig = (refId, value) => {
 
 const clearRenderContext = (refId) => {
   currentContext.delete(refId);
-  currentDispatcher.delete(refId);
 };
 
 export {
