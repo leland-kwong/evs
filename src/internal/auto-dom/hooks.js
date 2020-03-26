@@ -14,7 +14,6 @@ import {
   isFunc,
   withDefault,
   select,
-  alwaysTrue,
 } from '../utils';
 import {
   renderWith,
