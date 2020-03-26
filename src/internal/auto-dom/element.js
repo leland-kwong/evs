@@ -9,7 +9,6 @@ import {
   ignoredValues,
   validateVnodeValue,
   setTreeValue,
-  hasTreeValue,
   getTreeValue,
   onVtreeCompleted,
   setIsRendering,
@@ -437,12 +436,6 @@ const processLisp = (
 };
 
 const validateSeedPath = (seedPath) => {
-  const isPreExistingPath = hasTreeValue(seedPath);
-
-  if (isPreExistingPath) {
-    return;
-  }
-
   if (!vnodeKeyTypes[typeof seedPath]) {
     throw new Error(string([
       '[createElement] `seedPath` must be one of types: ',
@@ -451,10 +444,20 @@ const validateSeedPath = (seedPath) => {
   }
 
   validateKey(seedPath, 'seedPath');
+  return seedPath;
 };
 
+const FROM_PATH = Symbol('@fromPath');
+
+const seedPathFromPath = (path) =>
+  ({ value: path,
+     [FROM_PATH]: true });
+
+const WrapChildren = ({ children }) =>
+  children;
+
 /**
- * @param {Array} value atomic ui component
+ * @param {Array} value atomic ui element
  * @param {String | Number} seedPath id prefix
  * @returns vnode
  */
@@ -463,18 +466,28 @@ const createElement = (
   seedPath,
   onPathValue = setTreeValue,
 ) => {
-  if (process.env.NODE_ENV === 'development') {
-    validateSeedPath(seedPath);
-  }
+  const isFromPath = seedPath
+    && seedPath[FROM_PATH];
+  const validatedPath = isFromPath
+    ? seedPath.value
+    : validateSeedPath(
+      String(seedPath),
+    );
+  const isLispLike = isArray(value)
+    && isFunc(value[0]);
 
-  if (isType(value, valueTypes.vnode)) {
-    return value;
+  if (!isLispLike) {
+    return createElement(
+      [WrapChildren, value],
+      seedPath,
+      onPathValue,
+    );
   }
 
   const vtree = processLisp(
     value,
     newPath,
-    String(seedPath),
+    validatedPath,
     undefined,
     onPathValue,
   );
@@ -508,17 +521,10 @@ export {
   defineElement,
   nativeElements,
   renderWith,
-  /**
-   * TODO
-   * Remove this method from the public api since we
-   * don't want it to be used directly. This way we
-   * can prevent the issue with vnodes being shared
-   * between two different components because snabbdom
-   * reuses vnodes internally for optimization purposes.
-   */
   createElement,
   valueTypes,
   enqueueHook,
+  seedPathFromPath,
 };
 
 export {
