@@ -172,7 +172,8 @@ const prepareArgs = (
   while (i < args.length) {
     const argIndex = i + skip;
     const arg = lisp[argIndex];
-    const evaluated = callback(arg, path, i, prevCtor, onPathValue);
+    const evaluated = callback(arg, path, i,
+      prevCtor, onPathValue);
 
     args[i] = evaluated;
     i += 1;
