@@ -16,8 +16,9 @@ const Greeting = (props) => {
 
   return (
     [
+      [A.h1, 'Greeting'],
       [NameInput, { name, onNameChange }],
-      [A.h1,
+      [A.h3,
         'Hello ', name,
         children]]
   );

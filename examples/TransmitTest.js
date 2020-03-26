@@ -19,19 +19,27 @@ const Transmitter = ({ $$refId }) =>
 const getTime = () =>
   new Date().toLocaleTimeString();
 
-export const TransmitTest = ({ $$refId }) => {
-  const initialState = {
-    message: 'No message',
-    transmittedAt: getTime(),
-  };
-  const stateModel = useModel($$refId, $$refId, initialState);
+const initialState = {
+  message: 'No message',
+  transmittedAt: getTime(),
+};
+
+const useSetup = (refId) => {
+  const stateModel = useModel(refId, refId, initialState);
   const state = read(stateModel);
-  useReceiver($$refId, (message) => {
+
+  useReceiver(refId, (message) => {
     console.log(message);
     swap(stateModel, () =>
       ({ message,
          transmittedAt: getTime() }));
   });
+
+  return state;
+};
+
+export const TransmitTest = ({ $$refId }) => {
+  const state = useSetup($$refId);
 
   return (
     [A.div,

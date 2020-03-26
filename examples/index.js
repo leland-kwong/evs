@@ -16,6 +16,7 @@ import {
   useReceiver,
 } from '../src/internal/auto-dom';
 import { TransmitTest } from './TransmitTest';
+import { AsyncTest } from './AsyncTest';
 
 const { swap, read } = atomicState;
 
@@ -273,7 +274,7 @@ const Protected = (props) => {
       [A.pre,
         { style: errorStyle },
         [A.code,
-          err.stack]]
+          err.message]]
     );
   }
 };
@@ -375,6 +376,7 @@ const bootstrap = (seedPath) => {
       [View],
       [PerfTests],
       [TransmitTest],
+      [AsyncTest],
     ],
     seedPath,
   );
