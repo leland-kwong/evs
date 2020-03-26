@@ -1,6 +1,5 @@
 import { css } from 'emotion';
 import * as atomicState from 'atomic-state';
-import createDebug from 'debug';
 import { nativeElements as A } from '../src/internal/auto-dom/element';
 import {
   useModel,
@@ -8,7 +7,6 @@ import {
   shallowCompare,
 } from '../src/internal/auto-dom';
 
-const mainDebug = createDebug('TodoApp');
 const { swap, read } = atomicState;
 const cl = {
   list: css`
@@ -17,16 +15,16 @@ const cl = {
     list-style: none;`,
   itemStyle: (completed) =>
     css`
-    ${cl.list}
+      ${cl.list}
 
-    input {
-      text-decoration: ${completed ? 'line-through' : null};
-    }
+      input {
+        text-decoration: ${completed ? 'line-through' : null};
+      }
     `,
   sortBtn: (selected) =>
     css`
       background: ${selected ? '#3a88fd' : 'none'};
-      color: ${selected ? 'white' : 'none'};
+      color: ${selected ? 'white' : null};
     `,
 };
 
@@ -36,7 +34,7 @@ const uid = () =>
 const inputValue = (e) =>
   e.target.value;
 
-const initialItemCount = 50;
+const initialItemCount = 4;
 
 const initialModel = ({
   newTodo: {
@@ -211,8 +209,9 @@ const SortOptions = ({ onSortChange, sortBy }) => {
       [A.button,
         { type: 'button',
           class: cl.sortBtn(selected),
-          onClick: () =>
-            onSortChange({ direction }) },
+          onClick: () => {
+            onSortChange({ direction });
+          } },
         description]);
   };
   const btn = {
@@ -281,8 +280,6 @@ const AsyncExample = ({ $$refId }) => {
 };
 
 const TodoMain = ({ $$refId, name }) => {
-  mainDebug('[Main render]', $$refId);
-
   const model = useTodoModel($$refId);
   const { items = {}, newTodo, sortBy } = read(model);
 

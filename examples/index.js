@@ -12,7 +12,7 @@ import { TodoApp } from './todo-app';
 import {
   useModel,
   shallowCompare as shouldUpdate,
-  enqueueHook,
+  seedPathFromPath,
 } from '../src/internal/auto-dom';
 
 const { swap, read } = atomicState;
@@ -186,22 +186,6 @@ const ModalToggleBtn = ({
   );
 };
 
-const NullA = ({ $$refId }) => {
-  enqueueHook($$refId, (type) => {
-    console.log(type, $$refId);
-  });
-
-  return null;
-};
-
-const NullB = ({ $$refId }) => {
-  enqueueHook($$refId, (type) => {
-    console.log(type, $$refId);
-  });
-
-  return null;
-};
-
 const useRootModel = (refId) =>
   useModel(refId, 'rootModel', defaultState,
     { shouldCleanup: () =>
@@ -217,38 +201,6 @@ const ModalExamples = ({ name }) =>
     [ModalToggleBtn, { modalName: 'DefaultModal' }],
     [ModalToggleBtn, { modalName: 'OtherModal' }],
   ]);
-
-const ToggleField = ({ checked, onToggle }) =>
-  ([A.label,
-    [A.input,
-      { type: 'checkbox',
-        checked,
-        onChange: (ev) => {
-          onToggle(ev.target.checked);
-        } }],
-    'toggle field']);
-
-const MountDismountTest = ({ $$refId }) => {
-  const model = useModel($$refId, $$refId, { toggleState: false });
-  const state = read(model);
-
-  return ([
-    [state.toggleState ? NullA : NullB],
-
-    'checked: ',
-    String(state.toggleState),
-
-    [ToggleField,
-      { checked: state.toggleState,
-        onToggle(checked) {
-          swap(model, (s, toggleState) =>
-            ({
-              ...s,
-              toggleState,
-            }), checked);
-        } }],
-  ]);
-};
 
 const PerfTests = ({ $$refId }) => {
   const model = useRootModel($$refId);
@@ -313,41 +265,95 @@ const mainStyle = (
   ]
 );
 
+const Protected = (props) => {
+  const { $$refId, children } = props;
+
+  try {
+    return createElement(
+      children,
+      seedPathFromPath($$refId),
+    );
+  } catch (err) {
+    const errorStyle = {
+      color: 'white',
+      padding: '1em',
+      background: 'rgb(206, 62, 62)',
+      overflow: 'auto',
+      whiteSpace: 'pre-wrap',
+    };
+
+    return (
+      [A.pre,
+        { style: errorStyle },
+        [A.code,
+          err.stack]]
+    );
+  }
+};
+
+const ErrorMaker = ({ children }) => {
+  const rand = Math.random() * 10;
+
+  if (rand > 5) {
+    throw new Error('foobar');
+  }
+
+  return [A.div, 'safe: ', children];
+};
+
+const ProtectedExample = ({ name }) =>
+  ([Protected,
+    [ErrorMaker, name]]);
+
+const Cond = (props) => {
+  const { children: conditions, ...rest } = props;
+
+  return conditions
+    .filter(([predicate]) =>
+      predicate(rest))
+    .map(([, ComponentFn]) =>
+      [ComponentFn, rest]);
+};
+
 const View = ({ $$refId }) => {
   const model = useRootModel($$refId);
   const data = atomicState.read(model);
 
   const conditionalTodoApp = (
-    data.name.length < 10
-      ? [TodoAppMemoized]
-      : [A.comment]
+    [Cond,
+      { name: data.name },
+      [({ name }) =>
+        name.length < 10, TodoAppMemoized],
+    ]
   );
 
   const MultipleTodoApps = () =>
     ([
       conditionalTodoApp,
-      [TodoAppMemoized,
-        // { name: data.name },
-      ],
+      [TodoAppMemoized],
     ]);
 
-  return (
-    [
-      [ModalExamples, { name: data.name }],
+  return ([
+    [ModalExamples, { name: data.name }],
+    [MultipleTodoApps],
+    [ProtectedExample, data],
+    [Hello,
+      { name: data.name,
+        onNameChange(newName) {
+          swap(model, rootReducer, {
+            type: 'SetName',
+            name: newName,
+          });
+        } }],
+  ]);
+};
 
-      [MultipleTodoApps],
-
-      [Hello,
-        { name: data.name,
-          onNameChange(newName) {
-            swap(model, rootReducer, {
-              type: 'SetName',
-              name: newName,
-            });
-          },
-          key: 'HelloRoot',
-          shouldUpdate }],
-    ]);
+const cl = {
+  root: css`
+    font-family: sans-serif;
+    min-height: 100vh;
+    padding: 1rem;
+  `,
 };
 
 const bootstrap = (seedPath) => {
@@ -358,11 +364,7 @@ const bootstrap = (seedPath) => {
   renderWith(
     rootDom,
     [RootNode,
-      { class: css`
-            font-family: sans-serif;
-            min-height: 100vh;
-            padding: 1rem;
-          ` },
+      { class: cl.root },
       mainStyle,
       [View],
       // [MountDismountTest],
