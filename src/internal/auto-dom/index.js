@@ -1,7 +1,8 @@
 export * from './element';
 export {
   useModel,
-  hasModel,
+  useReceiver,
+  transmit,
   getAllModels,
 } from './hooks';
 export {

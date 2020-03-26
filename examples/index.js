@@ -13,7 +13,9 @@ import {
   useModel,
   shallowCompare as shouldUpdate,
   seedPathFromPath,
+  useReceiver,
 } from '../src/internal/auto-dom';
+import { TransmitTest } from './TransmitTest';
 
 const { swap, read } = atomicState;
 
@@ -181,7 +183,8 @@ const ModalToggleBtn = ({
         } },
       'Toggle modal: ',
       [A.strong, modalName],
-      [A.span, { style: { display: 'block' } },
+      [A.span,
+        { style: { display: 'block' } },
         'opened: ', [A.strong, String(opened)]]]
   );
 };
@@ -249,22 +252,6 @@ const PerfTests = ({ $$refId }) => {
   );
 };
 
-const mainStyle = (
-  [A.style,
-    /* css */`
-      body,
-      html {
-        margin: 0;
-        padding: 0;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-    `,
-  ]
-);
-
 const Protected = (props) => {
   const { $$refId, children } = props;
 
@@ -318,6 +305,9 @@ const Cond = (props) => {
 const View = ({ $$refId }) => {
   const model = useRootModel($$refId);
   const data = atomicState.read(model);
+  useReceiver($$refId, (message) => {
+    console.log(message);
+  });
 
   const conditionalTodoApp = (
     [Cond,
@@ -356,6 +346,22 @@ const cl = {
   `,
 };
 
+const mainStyle = (
+  [A.style,
+    /* css */`
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+    `,
+  ]
+);
+
 const bootstrap = (seedPath) => {
   const rootDom = document.createElement('div');
   const RootNode = A[rootDom.tagName.toLowerCase()];
@@ -367,8 +373,8 @@ const bootstrap = (seedPath) => {
       { class: cl.root },
       mainStyle,
       [View],
-      // [MountDismountTest],
       [PerfTests],
+      [TransmitTest],
     ],
     seedPath,
   );

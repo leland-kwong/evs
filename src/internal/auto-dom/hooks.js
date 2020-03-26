@@ -160,19 +160,41 @@ const useModel = (
   return model;
 };
 
-const emptyMap = new Map();
-
-const hasModel = (refId, key) =>
-  withDefault(
-    getScopedModels(refId),
-    emptyMap,
-  ).has(key);
-
 const getAllModels = (refId) =>
   getScopedModels(refId);
+
+const receivers = new Map();
+
+const cleanupReceiverOnDestroy = (
+  eventType, refId,
+) => {
+  if (eventType === 'destroy') {
+    receivers.delete(refId);
+  }
+};
+
+const useReceiver = (refId, callback) => {
+  receivers.set(refId, callback);
+  enqueueHook(refId, cleanupReceiverOnDestroy);
+};
+
+const transmit = (refId, message) => {
+  const path = refId.split(pathSeparator);
+  let i = path.length;
+  // travel up the path and trigger receivers along the way
+  while (i > 0) {
+    const p = path.slice(0, i).join(pathSeparator);
+    if (receivers.has(p)) {
+      receivers.get(p)(message);
+    }
+    i -= 1;
+  }
+};
 
 export {
   useModel,
   hasModel,
   getAllModels,
+  useReceiver,
+  transmit,
 };
