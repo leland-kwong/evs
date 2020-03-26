@@ -1,7 +1,6 @@
 # Todos
 
 [ ] - Add check for duplicate keys
-[ ] - Add module system for state and lifecycle hooks
 
 # EVS
 
