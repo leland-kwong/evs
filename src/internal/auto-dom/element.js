@@ -106,14 +106,26 @@ const consumeHooksQueue = () => {
 const addHooks = (element, hooks) => {
   const hookNode = getFragmentNodeFromFragment(element);
 
-  hookNode
-    .customHooks
-    .push(...hooks);
+  /**
+   * @Mutation
+   * Replace hooks with new ones each render
+   */
+  if (getIsRendering()) {
+    hookNode.customHooks = hooks;
+  /**
+   * @Mutation
+   * When asynchronously using a hook we insert it.
+   */
+  } else {
+    hookNode.customHooks
+      .push(...hooks);
+  }
 
   return element;
 };
 
 const enqueueHook = (refId, callback, arg) => {
+  // @Mutation
   hooksQueue.push([refId, callback, arg]);
 
   const isAsyncHookAdd = !getIsRendering();
@@ -212,6 +224,14 @@ const getPropsFromArgs = (value) => {
   return hasProps ? firstArg : emptyProps;
 };
 
+const refIdKey = Symbol('@refId');
+
+const refIdDescriptor = {
+  get() {
+    return this[refIdKey];
+  },
+};
+
 /**
  * @param {Array|arguments} value
  * @param {Function} argProcessor
@@ -241,13 +261,18 @@ const parseProps = (
     || shouldUpdate;
   const config = {
     props: applyProps({
-      [specialProps.$$refId]: refId,
+      [refIdKey]: refId,
       children: args,
     }, props),
     key: refId,
     originalShouldUpdate: shouldUpdate,
     ctor,
   };
+  Object.defineProperty(
+    config.props,
+    specialProps.$$refId,
+    refIdDescriptor,
+  );
   const currentConfig = getCurrentConfig(refId);
   const hasConfig = currentConfig
     !== noCurrentConfig;
